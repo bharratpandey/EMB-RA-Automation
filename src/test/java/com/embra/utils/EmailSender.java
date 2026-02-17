@@ -2,7 +2,6 @@ package com.embra.utils;
 
 import jakarta.mail.*;
 import jakarta.mail.internet.*;
-// Add these two missing imports for attachments:
 import jakarta.activation.DataHandler;
 import jakarta.activation.FileDataSource;
 
@@ -15,15 +14,13 @@ public class EmailSender {
         System.out.println("\n📧 Preparing to send Dashboard via Email...");
 
         // 1. Setup your SMTP credentials here
-        String fromEmail = "bharat.pandeyltd@gmail.com"; // Put your bot email here
+        final String fromEmail = "bharat.pandeyltd@gmail.com"; // Replace with your bot email
 
-        // This pulls the password from GitHub Secrets (or your local environment)
-        String appPassword = System.getenv("EMAIL_PASSWORD");
-
-        if (appPassword == null || appPassword.isEmpty()) {
-            // Fallback for local testing on your laptop
-            appPassword = "vbrxoolyucgujwer";
-        }
+        // 2. Safely assign the password exactly once to make it "effectively final"
+        String envPassword = System.getenv("EMAIL_PASSWORD");
+        final String appPassword = (envPassword == null || envPassword.isEmpty())
+                ? "vbrxoolyucgujwer" // Fallback for your local laptop
+                : envPassword;                 // The secret from GitHub Actions
 
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
@@ -31,9 +28,11 @@ public class EmailSender {
         props.put("mail.smtp.host", "smtp.gmail.com");
         props.put("mail.smtp.port", "587");
 
+        // 3. Create the session
         Session session = Session.getInstance(props, new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
+                // Now Java is happy because fromEmail and appPassword are final!
                 return new PasswordAuthentication(fromEmail, appPassword);
             }
         });
@@ -52,7 +51,6 @@ public class EmailSender {
             BodyPart attachmentPart = new MimeBodyPart();
             File file = new File(DashboardManager.REPORT_PATH);
             if(file.exists()) {
-                // Now DataHandler and FileDataSource will be recognized
                 attachmentPart.setDataHandler(new DataHandler(new FileDataSource(file)));
                 attachmentPart.setFileName("AutomationDashboard.html");
             }
