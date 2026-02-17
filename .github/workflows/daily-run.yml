@@ -2,8 +2,8 @@ name: Daily Automation Run
 
 on:
   schedule:
-    # 5:00 AM IST is 11:30 PM (23:30) UTC the previous day
-    - cron: '30 23 * * *'
+    # 6:00 PM IST is 12:30 PM UTC
+    - cron: '30 12 * * *'
   # This line creates a button so you can trigger it manually anytime
   workflow_dispatch:
 
