@@ -1,0 +1,40 @@
+name: Daily Automation Run
+
+on:
+  schedule:
+    # 5:00 AM IST is 11:30 PM (23:30) UTC the previous day
+    - cron: '30 23 * * *'
+  # This line creates a button so you can trigger it manually anytime
+  workflow_dispatch:
+
+jobs:
+  run-e2e-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Install Playwright Browsers & Dependencies
+        run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install --with-deps"
+
+      - name: Run E2E Tests
+        # xvfb-run allows UI tests to run smoothly on cloud servers
+        run: xvfb-run mvn test
+        env:
+          # This grabs the hidden password you just saved in GitHub Settings
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+
+      - name: Upload Dashboard Backup
+        if: always() # Saves the dashboard even if the test fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: Automation-Dashboard
+          path: target/AutomationDashboard.html
