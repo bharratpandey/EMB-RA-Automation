@@ -197,7 +197,7 @@ public class VendorAuthTest {
         DashboardClient.log("--------------------------------------------------");
 
         String uniqueEmail = "bharat.pandey+" + System.currentTimeMillis() + "@emb.global";
-        DashboardClient.log(" Registering unique vendor: {}", uniqueEmail);
+        DashboardClient.log(" Registering unique vendor: " + uniqueEmail);
 
         page.locator("a:has-text('Sign Up')").click();
         vendorAuthPage.signup("AutoVendor", uniqueEmail, "Emb@1234");
@@ -221,7 +221,7 @@ public class VendorAuthTest {
 
         // Gmail Polling Logic
         for (int i = 0; i < 12; i++) {
-            DashboardClient.log(" Checking inbox (Attempt {})", i + 1);
+            DashboardClient.log(" Checking inbox (Attempt " + (i + 1) + ")");
 
             Locator emailRow = gmailPage.locator("tr.zA")
                     .filter(new Locator.FilterOptions().setHasText("Email Verification")).first();
@@ -254,7 +254,7 @@ public class VendorAuthTest {
 
         // --- PHASE 3: FINAL VERIFICATION ---
         page.bringToFront();
-        DashboardClient.log(" Entering authentic OTP: {}", realOtp);
+        DashboardClient.log(" Entering authentic OTP: " + realOtp);
         vendorAuthPage.enterOTP(realOtp);
 
         assertThat(vendorAuthPage.getSuccessToastTitle()).hasText("Verified successfully!");
@@ -310,7 +310,7 @@ public class VendorAuthTest {
     void tearDown(TestInfo testInfo) {
         String tracePath = "traces/" + testInfo.getDisplayName().replace(" ", "_") + ".zip";
         context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get(tracePath)));
-        DashboardClient.log(" TEST COMPLETED. Trace: {}", tracePath);
+        DashboardClient.log(" TEST COMPLETED. Trace: " + tracePath);
         context.close();
     }
 
