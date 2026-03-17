@@ -45,25 +45,32 @@ public class ScheduleInterviewPage {
         requirementListingLink.click();
         page.waitForLoadState();
 
-        DashboardManager.log("   -> Searching for Requirement: " + reqName);
-        Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
+        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest")
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
+
+        DashboardManager.log("   -> Searching for Requirement (Cleaned): " + cleanName);
+
+        // 🚀 Use cleanName to find the specific row
+        Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(cleanName));
         reqRow.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
 
         // Check Status
         Locator statusBadge = reqRow.locator("div.bg-primary").filter(new Locator.FilterOptions().setHasText("Active"));
-        if (statusBadge.isVisible()) {
+        if (statusBadge.first().isVisible()) {
             DashboardManager.log("      ✅ Requirement Status: Active");
         } else {
             DashboardManager.log("      ❌ Requirement Status is NOT Active or not found.");
         }
 
         // Open Requirement
-        page.getByText(reqName).first().click();
+        page.getByText(cleanName).first().click();
         page.waitForTimeout(2000);
 
         // Verify Status on Details Page
         Locator detailsStatus = page.locator("div.bg-primary").filter(new Locator.FilterOptions().setHasText("Active"));
-        if (detailsStatus.isVisible()) {
+        if (detailsStatus.first().isVisible()) {
             DashboardManager.log("      ✅ Details Page Status: Active");
         }
     }

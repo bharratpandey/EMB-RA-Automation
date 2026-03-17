@@ -143,21 +143,28 @@ public class PartnerShortlistingPage {
 
         // Wait for popup
         page.locator("h3:has-text('Send Hiring Requirement')").waitFor();
+        page.waitForTimeout(1000);
 
         // 1. Vendor EURO (Using IDs)
         DashboardManager.log("   -> Filling EURO (3000 - 4000)");
         fillInputById("currency-min-EUR", "3000");
         fillInputById("currency-max-EUR", "4000");
 
+        page.waitForTimeout(1000);
+
         // 2. Vendor AED
         DashboardManager.log("   -> Filling AED (12000 - 17000)");
         fillInputById("currency-min-AED", "12000");
         fillInputById("currency-max-AED", "17000");
 
+        page.waitForTimeout(1000);
+
         // 3. Vendor USD
         DashboardManager.log("   -> Filling USD (3500 - 4500)");
         fillInputById("currency-min-USD", "3500");
         fillInputById("currency-max-USD", "4500");
+
+        page.waitForTimeout(1000);
 
         // 4. Vendor INR
         DashboardManager.log("   -> Filling INR (300000 - 400000)");
@@ -177,6 +184,7 @@ public class PartnerShortlistingPage {
 
     public void submitShortlisting() {
         DashboardManager.log("👉 Clicking Submit (Send to Partners)...");
+        page.waitForTimeout(2000);
         sendToPartnersSubmitBtn.click();
     }
 

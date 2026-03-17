@@ -1,0 +1,16 @@
+on:
+  repository_dispatch:
+    types: [manual-test-trigger]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Test
+        run: |
+          mvn test -Dtest=${{ github.event.client_payload.test_name }} \
+                   -Drun_id=${{ github.event.client_payload.run_id }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

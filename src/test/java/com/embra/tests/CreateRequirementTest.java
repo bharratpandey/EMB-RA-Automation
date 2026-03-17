@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -42,7 +43,14 @@ public class CreateRequirementTest {
 
     @BeforeEach
     void setup() {
-        context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+
+        // ⭐ ADD THIS: Start tracing before creating the page
+        context.tracing().start(new Tracing.StartOptions()
+                .setScreenshots(true)
+                .setSnapshots(true)
+                .setSources(true));
+
         page = context.newPage();
         page.navigate("https://uat-admin.embtalent.ai/login");
     }
@@ -56,7 +64,9 @@ public class CreateRequirementTest {
 
         // --- 1. Login & Navigation ---
         LoginPage loginPage = new LoginPage(page);
-        assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed");
+        assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed"); //deev=saumyaadminqa@yopmail.com,admin@122 ,uaat=bharat.pandey@emb.global
+
+
 
         RequirementListingPage listingPage = new RequirementListingPage(page);
         assertTrue(listingPage.clickNewRequirement(), "Navigation failed");
@@ -65,18 +75,40 @@ public class CreateRequirementTest {
         CreateRequirementPage createPage = new CreateRequirementPage(page);
         String commonJdPath = JD_FILE_PATH;
 
+        // Change the first parameter from 'false' to the desired Engagement Type String
+        // Example: "Full Time", "Contractual", or "Contract To Hire"
         boolean success = createPage.createMultipleRequirements(List.of(
-                new CreateRequirementPage.RequirementData(false, false, "JS", "React", "52106", commonJdPath)
-                // Add more here if needed
+                new CreateRequirementPage.RequirementData("Full Time", "Onsite", "JS", "React", "52106", commonJdPath)
+                //,new CreateRequirementPage.RequirementData("Contractual", "Hybrid", "Java", "Spring", "52107", commonJdPath),
+                //new CreateRequirementPage.RequirementData("Contract To Hire", "Remote", "Python", "Django", "52108", commonJdPath),
+                //new CreateRequirementPage.RequirementData("Full Time", "Onsite", "Node", "Express", "52109", commonJdPath)
         ), "Requirement generated successfully");
 
         assertTrue(success, "Failed to create requirements");
 
+
         // ──────────────────────────────────────────────────────────────
         // 3. CAPTURE NAME & STATUS
         // ──────────────────────────────────────────────────────────────
-        String firstReqName = verifyTopRequirements(4);
-        DashboardManager.log("[INFO] 📌 The ID we will use for Vendor Portal is: " + firstReqName);
+        String firstReqName = verifyTopRequirements(1);
+
+        /*
+        String firstReqName = "AUT93 - AI Engineer 3 yoe 66";
+        DashboardManager.log("[INFO] The ID we will use for Vendor Portal is: " + firstReqName);
+
+
+         */
+        // ──────────────────────────────────────────────────────────────
+        // 🏁 NAVIGATION TO EXISTING REQUIREMENT
+        // ──────────────────────────────────────────────────────────────
+        DashboardManager.log("   -> Navigating to Requirement Listing...");
+        page.locator("a[href='/hiring-requests']").first().click();
+        page.waitForLoadState();
+
+        DashboardManager.log("   -> Opening Requirement: " + firstReqName);
+        // Find the specific requirement and click it
+        page.getByText(firstReqName).first().click();
+        page.waitForTimeout(2000);
 
         // ──────────────────────────────────────────────────────────────
         // 4. PARTNER SHORTLISTING FLOW
@@ -84,11 +116,11 @@ public class CreateRequirementTest {
         DashboardManager.log("\n[REPORT] 🚀 Starting Partner Shortlisting Flow for: " + firstReqName);
 
         PartnerShortlistingPage partnerPage = new PartnerShortlistingPage(page);
-        partnerPage.openFirstRequirement();
+        // partnerPage.openFirstRequirement();
         partnerPage.verifyRequirementStatus();
         partnerPage.navigateToPartnerShortlisting();
         page.waitForTimeout(2000);
-        partnerPage.shortlistVendors(List.of("bharat pvt ltd", "Vendor Euro", "Vendor AED", "Vendor USD"));
+        partnerPage.shortlistVendors(List.of("bharat pvt ltd", "Vendor Eur", "Vendor AED", "Vendor USD"));
         partnerPage.clickSendHiringRequirement();
         partnerPage.fillBudgetDetails();
         partnerPage.submitShortlisting();
@@ -101,25 +133,33 @@ public class CreateRequirementTest {
         // ──────────────────────────────────────────────────────────────
         DashboardManager.log("\n[REPORT] 🔄 Switching to Vendor Portal...");
 
-        BrowserContext vendorContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        BrowserContext vendorContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+
+        // ⭐ TRACING FOR VENDOR 1
+        vendorContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage = vendorContext.newPage();
         vendorPage.navigate("https://uat-vendor.embtalent.ai/login");
 
         SubmitCandidatePage submitPage = new SubmitCandidatePage(vendorPage);
-        submitPage.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234");
+        submitPage.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234"); //deev=bharat.pandey@emb.global ,uat=bharat.pandey+1@emb.global
         submitPage.navigateToProject(firstReqName);
         submitPage.acceptProject();
 
         submitPage.addMembers(1, JD_FILE_PATH); // Adding 1 member as per your request
+        submitPage.addMembersFromTeam(Arrays.asList("Candidate 2", "Candidate 3", "Candidate 4"));
 
+        // Then click final submit
         submitPage.submitCandidates();
+
         submitPage.verifyCandidateStatus();
 
         // Close Vendor Context
+        vendorContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-1-submit-trace.zip")));
         vendorContext.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Flow Completed.");
 
-        /* =========================================================================
+         /* =========================================================================
            TEMPORARILY SKIPPED: ASSESSMENT FLOW (Steps 6, 7, and 8)
            (Delete the /* here and the * / below to reactivate this section)
            ========================================================================= */
@@ -197,7 +237,7 @@ public class CreateRequirementTest {
         ScheduleAssessmentPage vendorVerify = new ScheduleAssessmentPage(vendorPage3);
 
         vendorVerify.verifyVendorAssessmentStatus(
-                "https://uat-vendor.embtalent.ai/login",
+                "https://deev-vendor.embtalent.ai/login",
                 "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
@@ -206,6 +246,7 @@ public class CreateRequirementTest {
         vendorContext3.close();
         DashboardManager.log("[REPORT] ✅ Assessment E2E Flow Completed Successfully!");
         */
+
 
         // ──────────────────────────────────────────────────────────────
         // 9. SCHEDULE ASSIGNMENT FLOW
@@ -243,17 +284,21 @@ public class CreateRequirementTest {
         DashboardManager.log("\n[REPORT] 🏢 Vendor: Submitting Assignment Solution...");
 
         BrowserContext vendorContext4 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        // ⭐ TRACING FOR VENDOR 4
+        vendorContext4.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage4 = vendorContext4.newPage();
 
         ScheduleAssignmentPage vendorAssignmentPage = new ScheduleAssignmentPage(vendorPage4);
         vendorAssignmentPage.vendorSubmitAssignmentSolution(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",
+                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
                 "Emb@1234",
                 firstReqName,
                 JD_FILE_PATH
         );
 
+        vendorContext4.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-4-assignment-solution-trace.zip")));
         vendorContext4.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Assignment Solution Submitted.");
 
@@ -276,16 +321,20 @@ public class CreateRequirementTest {
         DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Final Assignment Status...");
 
         BrowserContext vendorContext5 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        // ⭐ TRACING FOR VENDOR 5
+        vendorContext5.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage5 = vendorContext5.newPage();
 
         ScheduleAssignmentPage finalVendorPage = new ScheduleAssignmentPage(vendorPage5);
         finalVendorPage.vendorVerifyFinalAssignmentStatus(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",
+                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
                 "Emb@1234",
                 firstReqName
         );
 
+        vendorContext5.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-5-assignment-verify-trace.zip")));
         vendorContext5.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Final Verification Completed.");
 
@@ -324,16 +373,20 @@ public class CreateRequirementTest {
         DashboardManager.log("\n[REPORT] 🏢 Vendor: Selecting Interview Time Slots...");
 
         BrowserContext vendorContext6 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        // ⭐ TRACING FOR VENDOR 6
+        vendorContext6.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage6 = vendorContext6.newPage();
 
         UploadInterviewPage uploadInterviewPage = new UploadInterviewPage(vendorPage6);
         uploadInterviewPage.vendorSelectInterviewTime(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",
+                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
                 "Emb@1234",
                 firstReqName
         );
 
+        vendorContext6.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-6-interview-slots-trace.zip")));
         vendorContext6.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Time Slots Selected.");
 
@@ -357,16 +410,20 @@ public class CreateRequirementTest {
         DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Final Interview Status...");
 
         BrowserContext vendorContext7 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        // ⭐ TRACING FOR VENDOR 7
+        vendorContext7.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage7 = vendorContext7.newPage();
 
         UploadInterviewPage finalVerifyInterviewPage = new UploadInterviewPage(vendorPage7);
         finalVerifyInterviewPage.vendorVerifyFinalInterviewStatus(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",
+                "bharat.pandey+1@emb.global",//deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
                 "Emb@1234",
                 firstReqName
         );
 
+        vendorContext7.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-7-interview-verify-trace.zip")));
         vendorContext7.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Final Interview Verification Completed.");
 
@@ -390,20 +447,150 @@ public class CreateRequirementTest {
         // B. Vendor: Verify Deployment
         DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Deployment...");
         BrowserContext vendorContext8 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
+        // ⭐ TRACING FOR VENDOR 8
+        vendorContext8.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
         Page vendorPage8 = vendorContext8.newPage();
 
         OfferJobPage vendorVerifyDeploy = new OfferJobPage(vendorPage8);
         vendorVerifyDeploy.vendorVerifyDeployedStatus(
+                "https://uat-vendor.embtalent.ai/login",
+                "bharat.pandey+1@emb.global",//deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "Emb@1234",
+                firstReqName
+        );
+
+        vendorContext8.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-8-deploy-verify-trace.zip")));
+        vendorContext8.close();
+        DashboardManager.log("[REPORT] ✅ Full E2E Journey Completed Successfully!");
+
+        // ──────────────────────────────────────────────────────────────
+        // 18. HOLD, REJECT & SHARE WITH CLIENT FLOW
+        // ──────────────────────────────────────────────────────────────
+        DashboardManager.log("\n[REPORT] 🚀 Starting Hold, Reject & Share with Client Flow...");
+
+        page.bringToFront();
+        page.waitForTimeout(1000);
+        HoldRejectSentClientPage postDeployPage = new HoldRejectSentClientPage(page);
+
+        // A. Admin Side Actions
+        postDeployPage.processCandidatesOnAdmin(firstReqName);
+        postDeployPage.printFinalSummaryAdmin();
+
+        // B. Vendor Side Verification
+        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying All Final Statuses...");
+        BrowserContext vendorContextFinal = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+        // ⭐ TRACING FOR VENDOR FINAL
+        vendorContextFinal.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
+        Page vendorPageFinal = vendorContextFinal.newPage();
+
+        HoldRejectSentClientPage vendorFinalVerify = new HoldRejectSentClientPage(vendorPageFinal);
+        vendorFinalVerify.vendorVerifyFinalStatuses(
                 "https://uat-vendor.embtalent.ai/login",
                 "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
 
-        vendorContext8.close();
-        DashboardManager.log("[REPORT] ✅ Full E2E Journey Completed Successfully!");
+        vendorContextFinal.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-final-statuses-trace.zip")));
+        vendorContextFinal.close();
+        DashboardManager.log("[REPORT] ✅ Full E2E Multi-Candidate Journey Completed Successfully!");
 
-    }// <-- End of createFourRequirementsAtOnce method
+        // ──────────────────────────────────────────────────────────────
+        // 19. ALLOW RESUBMISSION FLOW
+        // ──────────────────────────────────────────────────────────────
+        DashboardManager.log("\n[REPORT] 🚀 Starting Allow Resubmission Flow...");
+        page.bringToFront();
+        AllowResubmissionPage resubmitPage = new AllowResubmissionPage(page);
+
+        // Admin Action
+        resubmitPage.allowResubmissionsOnAdmin(firstReqName);
+
+        // Vendor Action
+        BrowserContext vendorContextResubmit = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+        // ⭐ TRACING FOR VENDOR RESUBMIT
+        vendorContextResubmit.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
+        Page vendorPageResubmit = vendorContextResubmit.newPage();
+        AllowResubmissionPage vendorResubmit = new AllowResubmissionPage(vendorPageResubmit);
+
+        vendorResubmit.vendorPerformResubmission(
+                "https://uat-vendor.embtalent.ai/login",
+                "bharat.pandey+1@emb.global",
+                "Emb@1234",
+                firstReqName
+        );
+        vendorContextResubmit.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-resubmit-trace.zip")));
+        vendorContextResubmit.close();
+
+        // ──────────────────────────────────────────────────────────────
+        // 20. CLIENT SHORTLIST & REJECT FLOW
+        // ──────────────────────────────────────────────────────────────
+        DashboardManager.log("\n[REPORT] 🚀 Starting Client Shortlist Flow...");
+
+        // 1. Client Side: Shortlist
+        BrowserContext clientContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+        // ⭐ TRACING FOR CLIENT PORTAL
+        clientContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
+        Page clientPage = clientContext.newPage();
+        ClientShortlistPage clientFlow = new ClientShortlistPage(clientPage);
+
+        clientFlow.loginAndShortlist("https://uat-client.embtalent.ai/login", "AutoTest@yopmail.com", "Emb@1234", firstReqName);
+
+        // 2. Admin Side: Verify Shortlist
+        page.bringToFront();
+        ClientShortlistPage adminVerify = new ClientShortlistPage(page);
+        adminVerify.verifyShortlistOnAdmin(firstReqName);
+
+        // 3. Client Side: Reject
+        clientPage.bringToFront();
+        clientFlow.clientRejectCandidate(firstReqName);
+
+        // 4. Admin Side: Verify Rejection
+        page.bringToFront();
+        adminVerify.verifyRejectionOnAdmin(firstReqName);
+
+        clientContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-portal-trace.zip")));
+        clientContext.close();
+
+        // ──────────────────────────────────────────────────────────────
+        // 21. REQUIREMENT COMPLETION FLOW
+        // ──────────────────────────────────────────────────────────────
+        RequirementCompletedPage completedFlow = new RequirementCompletedPage(page);
+
+        // A. Admin Side: Deploy Candidate 2
+        completedFlow.adminDeployCandidate(firstReqName, "Candidate 2", "bharat pvt ltd", JD_FILE_PATH);
+
+        // B. Vendor Side: Verify Completion
+        BrowserContext vendorCtx = browser.newContext();
+
+        // ⭐ TRACING FOR VENDOR COMPLETION
+        vendorCtx.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
+        RequirementCompletedPage vendorVerify = new RequirementCompletedPage(vendorCtx.newPage());
+        vendorVerify.verifyPortalStatus("Vendor", "https://uat-vendor.embtalent.ai/login", "bharat.pandey+1@emb.global", "Emb@1234", firstReqName);
+
+        vendorCtx.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-completion-verify-trace.zip")));
+
+        vendorCtx.close();
+
+        // C. Client Side: Verify Completion
+        BrowserContext clientCtx = browser.newContext();
+
+        // ⭐ TRACING FOR CLIENT COMPLETION
+        clientCtx.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+
+        RequirementCompletedPage clientVerify = new RequirementCompletedPage(clientCtx.newPage());
+        clientVerify.verifyPortalStatus("Client", "https://uat-client.embtalent.ai/login", "AutoTest@yopmail.com", "Emb@1234", firstReqName);
+
+        clientCtx.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-completion-verify-trace.zip")));
+
+        clientCtx.close();
+    }
+
+    // <-- End of createFourRequirementsAtOnce method
 
     private String verifyTopRequirements(int limit) {
         DashboardManager.log("\n[REPORT] 🔍 Verifying Table Data...");
@@ -435,11 +622,18 @@ public class CreateRequirementTest {
         }
         return firstTitle;
     }
-
     @AfterEach
     void tearDown() {
-        if (page != null) page.close();
-        if (context != null) context.close();
+        if (context != null) {
+            try {
+                // Use a dynamic name or just be sure to delete the old one manually
+                context.tracing().stop(new Tracing.StopOptions()
+                        .setPath(Paths.get("target/admin-trace-latest.zip")));
+            } catch (Exception e) {
+                System.err.println("Failed to save Admin trace: " + e.getMessage());
+            }
+            context.close();
+        }
     }
 
     @AfterAll
@@ -453,7 +647,6 @@ public class CreateRequirementTest {
         // Put the email address you want to send the dashboard to here:
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
-        EmailSender.sendDashboardEmail("neeraj.manral@emb.global");
-
+        //EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
     }
 }

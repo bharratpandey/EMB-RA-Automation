@@ -315,28 +315,30 @@ public class SubmitCandidatePage {
         }
     }
 
-    public void navigateToProject(String reqTitle) {
-        DashboardManager.log("📂 Navigating to Projects...");
-        try {
-            projectTab.click();
-            page.waitForTimeout(3000);
-            page.locator("h3").first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
-            DashboardManager.log("🔎 Searching for Requirement: [" + reqTitle + "]");
-            Locator reqLink = page.locator("h3").getByText(reqTitle, new Locator.GetByTextOptions().setExact(true));
-            if (reqLink.isVisible()) {
-                reqLink.click();
-                DashboardManager.log("✅ Found & Clicked: " + reqTitle);
-            } else {
-                DashboardManager.log("❌ Specific Req not found. Clicking first project fallback.");
-                page.locator("div.border-b a").first().click();
-            }
-        } catch (Exception e) {
-            DashboardManager.log("❌ Navigation Failed: " + e.getMessage());
+    public void navigateToProject(String projectName) {
+
+        //0 Clicking on the Project tab
+        projectTab.click();
+        page.waitForTimeout(2000);
+        // 1. Wait for the cards to actually load on the page
+        page.locator("a.cursor-pointer").first().waitFor();
+
+        // 2. Find the specific card
+        Locator projectCard = page.locator("a.cursor-pointer")
+                .filter(new Locator.FilterOptions().setHasText(projectName));
+
+        if (projectCard.count() > 0) {
+            projectCard.first().click();
+        } else {
+            // Fallback: click the very first available card
+            page.locator("a.cursor-pointer").first().click();
         }
     }
 
+
     public void acceptProject() {
         DashboardManager.log("👍 Checking Project Status...");
+        page.waitForTimeout(2000);
         try {
             page.locator("h1").first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
             Locator anyBtn = acceptBtn.or(endProjectBtn);
@@ -517,15 +519,93 @@ public class SubmitCandidatePage {
     }
 
     public void submitCandidates() {
-        DashboardManager.log("🚀 Submitting Candidates...");
+        DashboardManager.log("🚀 Submitting Candidates for Interview...");
         try {
+            // 1. Click the Submit button
             submitCandidatesBtn.click();
-            page.waitForTimeout(6000);
-            DashboardManager.log("✅ Candidates Submitted.");
+            DashboardManager.log("      -> Submit button clicked. Waiting for process completion...");
+
+            // 2. Wait for the Success Toast (even if it's quick, it signals the start of processing)
+            page.getByText("Submitted successful!", new Page.GetByTextOptions().setExact(false))
+                    .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+
+            // 3. 🚀 CRITICAL WAIT: Wait for the candidates to actually appear with "Applied" status
+            // We target the status badge specifically with a 45-second timeout
+            DashboardManager.log("      ⏳ Waiting for candidates to become visible in the table (Max 45s)...");
+
+            Locator appliedStatusBadge = page.locator("tr.group").first().locator("span").filter(new Locator.FilterOptions().setHasText("Applied"));
+
+            appliedStatusBadge.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(90000));
+
+            DashboardManager.log("      ✅ Candidates are now visible and processed.");
+
+            // 4. Final small buffer to ensure all rows in the batch have finished rendering
+            page.waitForTimeout(2000);
+
         } catch (Exception e) {
-            DashboardManager.log("❌ Failed to Submit Candidates.");
+            DashboardManager.log("❌ Submission took too long or failed: " + e.getMessage());
+            // Take a screenshot to debug if the table is stuck or empty
+            page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get("target/submission_timeout.png")));
         }
-        page.waitForTimeout(3000);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // ⚡️ NEW: ADD MEMBERS FROM TEAM (BENCH) ⚡️
+    // ──────────────────────────────────────────────────────────────
+    public void addMembersFromTeam(List<String> candidateNames) {
+        DashboardManager.log("\n👥 Adding members from existing Team/Bench...");
+        try {
+            // 1. Click 'Select From Team' button
+            Locator selectFromTeamBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Select From Team"));
+            selectFromTeamBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+            selectFromTeamBtn.click();
+            DashboardManager.log("   -> 'Select From Team' modal opened.");
+
+            Locator searchInput = page.locator("input[name='search']");
+
+            for (String name : candidateNames) {
+                DashboardManager.log("   🔍 Searching for: " + name);
+
+                // Clear search if not empty (using keyboard for thoroughness)
+                searchInput.fill("");
+                searchInput.fill(name);
+                page.waitForTimeout(1500); // Wait for search results to filter
+
+                // Locate the first result's checkbox
+                // We target the checkbox that is a sibling of the container holding the name
+                Locator candidateRow = page.locator("div.flex.w-full.flex-row")
+                        .filter(new Locator.FilterOptions().setHas(page.getByText(name, new Page.GetByTextOptions().setExact(true))))
+                        .first();
+
+                if (candidateRow.count() > 0) {
+                    Locator checkbox = candidateRow.locator("button[role='checkbox']");
+                    if (!"checked".equals(checkbox.getAttribute("data-state"))) {
+                        checkbox.click();
+                        DashboardManager.log("      ✅ Selected: " + name);
+                    } else {
+                        DashboardManager.log("      ℹ️ " + name + " was already selected.");
+                    }
+                } else {
+                    DashboardManager.log("      ❌ Candidate [" + name + "] not found in the list!");
+                }
+                page.waitForTimeout(500);
+            }
+
+            // 2. Click Save Selection
+            Locator saveSelectionBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Save Selection"));
+            saveSelectionBtn.click();
+            DashboardManager.log("   -> Clicked 'Save Selection'.");
+
+            // 3. Verify Success Toast
+            page.getByText("Team members added successfully", new Page.GetByTextOptions().setExact(false))
+                    .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
+            DashboardManager.log("   ✅ Team members successfully added to the project.");
+
+        } catch (Exception e) {
+            DashboardManager.log("   ❌ Error adding members from team: " + e.getMessage());
+        }
     }
 
     public void verifyCandidateStatus() {

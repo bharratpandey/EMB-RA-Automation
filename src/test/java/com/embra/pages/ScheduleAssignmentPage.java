@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.util.regex.Pattern;
 import com.embra.utils.DashboardManager;
 
+
 public class ScheduleAssignmentPage {
 
     private final Page page;
@@ -208,7 +209,7 @@ public class ScheduleAssignmentPage {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 🆕 NEW: VENDOR SUBMITS ASSIGNMENT SOLUTION
+    // 🆕 UPDATED: VENDOR SUBMITS ASSIGNMENT SOLUTION
     // ──────────────────────────────────────────────────────────────
 
     public void vendorSubmitAssignmentSolution(String vendorUrl, String email, String password, String reqName, String dummyFilePath) {
@@ -224,26 +225,42 @@ public class ScheduleAssignmentPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        DashboardManager.log("   -> Searching for Project: " + reqName);
-        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(reqName));
+        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest")
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
+
+        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+
+        // Use cleanName for the locator
+        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
 
         // 2. Verify Project Status (Interviewing)
-        Locator projectCard = projectTitle.locator("..").locator(".."); // Traverse up to row container
-        Locator interviewingBadge = projectCard.locator("span.text-project-interviewing");
-        if (interviewingBadge.isVisible()) {
-            DashboardManager.log("      ✅ Project Status: Interviewing");
-        } else {
-            DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
+        try {
+            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
+            Locator card = projectTitle.first().locator("xpath=./ancestor::a[1]");
+
+            Locator statusText = card.locator("span.text-project-interviewing");
+            if (statusText.isVisible()) {
+                DashboardManager.log("      ✅ Project Status: Interviewing");
+            } else {
+                DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
+            }
+
+            projectTitle.first().click();
+            page.waitForTimeout(2000);
+        } catch (Exception e) {
+            DashboardManager.log("      ❌ FAILED: Project " + cleanName + " not found on Vendor Dashboard.");
+            throw e;
         }
 
-        projectTitle.click();
-        page.waitForTimeout(2000);
+        // ... remaining code same as before ...
 
         // 3. Verify Candidate Status & Open
         DashboardManager.log("   -> Opening Candidate 1...");
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
         Locator ongoingBadge = candidateRow.locator("span.status-blue-text");
-        if (ongoingBadge.isVisible() && ongoingBadge.innerText().contains("Assessment Ongoing")) {
+        if (ongoingBadge.isVisible() && ongoingBadge.innerText().contains("Assignment Ongoing")) {
             DashboardManager.log("      ✅ Candidate Status: Assessment Ongoing");
         } else {
             DashboardManager.log("      ❌ Candidate Status mismatch. Found: " + candidateRow.innerText());
@@ -251,11 +268,25 @@ public class ScheduleAssignmentPage {
         candidateRow.click();
         page.waitForTimeout(2000);
 
-        // 4. Print Assignment Listing Details (We are already on the Assignment tab)
-        Locator assignmentRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("SSW"));
+        // 4. Print Assignment Listing Details + Verify Status
         DashboardManager.log("\n      [Vendor Assignment Listing Details]");
-        DashboardManager.log("      " + assignmentRow.innerText().replace("\n", " | "));
+        Locator assignmentRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("SSW"));
+        String rowText = assignmentRow.innerText().trim().replaceAll("\\s+", " ");
+        DashboardManager.log("      " + rowText);
         DashboardManager.log("      -------------------------------------\n");
+
+        Locator statusBadge = assignmentRow.locator("span.status-blue-text");
+        if (statusBadge.isVisible()) {
+            String actualStatus = statusBadge.innerText().trim();
+            DashboardManager.log("      Detected Status: " + actualStatus);
+            if (actualStatus.equalsIgnoreCase("Assignment Scheduled")) {
+                DashboardManager.log("      ✅ Status Verified: Assignment Scheduled");
+            } else {
+                DashboardManager.log("      ❌ Status Mismatch! Expected: Assignment Scheduled | Found: " + actualStatus);
+            }
+        } else {
+            DashboardManager.log("      ❌ Status badge not found in the row!");
+        }
 
         // 5. Upload Solution Form
         DashboardManager.log("   -> Clicking Upload & Filling Form...");
@@ -269,10 +300,8 @@ public class ScheduleAssignmentPage {
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Add new link")).click();
         page.locator("input[name='links.1']").fill("www.example2.com");
 
-        // Submit Assignment
         page.locator("button[type='submit']").filter(new Locator.FilterOptions().setHasText("Submit Assignment")).click();
 
-        // 6. Verify Toast & Status Change
         if (waitForToast("Assignment submitted successfully.")) {
             DashboardManager.log("      ✅ Toast Verified: Assignment submitted successfully.");
         } else {
@@ -282,7 +311,6 @@ public class ScheduleAssignmentPage {
         DashboardManager.log("   ⏳ Waiting 4 seconds for system update...");
         page.waitForTimeout(4000);
 
-        // Verify new status is "Assignment Submitted"
         Locator newAssignmentRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("SSW"));
         Locator submittedBadge = newAssignmentRow.locator("span.status-blue-text");
         if (submittedBadge.isVisible() && submittedBadge.innerText().contains("Assignment Submitted")) {
@@ -291,7 +319,6 @@ public class ScheduleAssignmentPage {
             DashboardManager.log("      ❌ Assignment Status mismatch. Found: " + newAssignmentRow.innerText());
         }
 
-        // 7. Open Details Modal & Compare
         DashboardManager.log("   -> Opening Assignment Details Modal...");
         newAssignmentRow.click();
         page.waitForTimeout(1000);
@@ -301,52 +328,52 @@ public class ScheduleAssignmentPage {
         DashboardManager.log("      " + detailsModal.innerText().replace("\n", " | "));
         DashboardManager.log("      -------------------------------------\n");
 
-        DashboardManager.log("   -> Closing Modal...");
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Close")).click();
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 🆕 NEW: ADMIN REVIEWS ASSIGNMENT & SUBMITS FEEDBACK
+    // ADMIN REVIEWS ASSIGNMENT & SUBMITS FEEDBACK
     // ──────────────────────────────────────────────────────────────
 
     public void adminSubmitAssignmentFeedback(String reqName, String candidateName) {
-        DashboardManager.log("\n--- 👮 ADMIN: REVIEW ASSIGNMENT & SUBMIT FEEDBACK ---");
-
         DashboardManager.log("   -> Navigating to Requirement Listing...");
         requirementListingLink.click();
-        page.waitForLoadState();
+        page.waitForTimeout(3000);
 
-        // Check active status & open
+        DashboardManager.log("   -> Opening Requirement: " + reqName);
         Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
-        if (reqRow.locator("div.bg-primary").filter(new Locator.FilterOptions().setHasText("Active")).isVisible()) {
-            DashboardManager.log("      ✅ Requirement Status: Active");
-        } else {
-            DashboardManager.log("      ❌ Requirement Status is NOT Active.");
-        }
-        page.getByText(reqName).first().click();
-        page.waitForTimeout(2000);
 
-        // Open Candidate
+        if (reqRow.count() == 0) {
+            DashboardManager.log("      ❌ Requirement '" + reqName + "' not found in table!");
+        } else {
+            page.getByText(reqName).first().click();
+            page.waitForTimeout(4000);
+        }
+
+        Locator activeBadge = page.locator("div[style*='background-color: rgb(147, 196, 125)']:has-text('Active')");
+        if (activeBadge.isVisible()) {
+            DashboardManager.log("      ✅ Requirement Status: Active (green badge detected)");
+        } else {
+            DashboardManager.log("      ❌ Requirement Status is NOT Active");
+        }
+
         candidatesTab.click();
         page.waitForTimeout(1000);
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
         candidateRow.locator("button[title='View Details']").click();
         page.waitForTimeout(2000);
 
-        // Verify Candidate Status
         Locator statusChip = page.locator("div").filter(new Locator.FilterOptions().setHasText("Assignment Ongoing")).last();
         if (statusChip.isVisible()) {
             DashboardManager.log("      ✅ Candidate Status: Assignment Ongoing");
         } else {
-            DashboardManager.log("      ⚠️ Candidate Status mismatch (Found: " + page.locator("div.text-white").first().innerText() + ")");
+            DashboardManager.log("      ⚠️ Candidate Status mismatch");
         }
 
-        // Go to Assignment Tab (Using exact ARIA Role from your HTML)
         DashboardManager.log("   -> Switching to Assignment Tab...");
         page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Assignment")).click();
-        page.waitForTimeout(2000); // Wait for tab data to render
+        page.waitForTimeout(2000);
 
-        // Print Assignment Solution Data (Targeting the exact wrapper class from your HTML)
         Locator solutionCard = page.locator("div.bg-white.border.border-gray-200.rounded-lg.p-4").first();
         try {
             solutionCard.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
@@ -357,7 +384,6 @@ public class ScheduleAssignmentPage {
             DashboardManager.log("      ⚠️ Could not print assignment details: " + e.getMessage());
         }
 
-        // Submit Feedback
         page.waitForTimeout(1800);
         DashboardManager.log("   -> Clicking 'Submit Feedback'...");
         Locator submitFeedbackBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Feedback")).first();
@@ -368,12 +394,10 @@ public class ScheduleAssignmentPage {
         feedbackTextarea.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         feedbackTextarea.fill("this is automated reason");
 
-        // Target the green submit button specifically
         DashboardManager.log("   -> Clicking Final Submit...");
         Locator finalSubmitBtn = page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Submit"));
         finalSubmitBtn.click();
 
-        // Verify Toast
         if (waitForToast("Feedback submitted successfully!")) {
             DashboardManager.log("      ✅ Toast Verified: Feedback submitted successfully!");
         } else {
@@ -382,7 +406,6 @@ public class ScheduleAssignmentPage {
 
         page.waitForTimeout(2000);
 
-        // Print Feedback Details
         DashboardManager.log("   🔍 Capturing Submitted Feedback...");
         Locator feedbackCard = page.locator("h5").filter(new Locator.FilterOptions().setHasText("Feedback")).locator("..");
         if (feedbackCard.isVisible()) {
@@ -395,11 +418,7 @@ public class ScheduleAssignmentPage {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 🆕 NEW: VENDOR VERIFIES FINAL ASSIGNMENT STATUS
-    // ──────────────────────────────────────────────────────────────
-
-    // ──────────────────────────────────────────────────────────────
-    // 🆕 NEW: VENDOR VERIFIES FINAL ASSIGNMENT STATUS
+    // 🆕 UPDATED: VENDOR VERIFIES FINAL ASSIGNMENT STATUS
     // ──────────────────────────────────────────────────────────────
 
     public void vendorVerifyFinalAssignmentStatus(String vendorUrl, String email, String password, String reqName) {
@@ -414,23 +433,27 @@ public class ScheduleAssignmentPage {
 
         // 2. Go to Projects
         page.locator("a[href='/projects']").click();
-        page.waitForTimeout(2000);
+        page.waitForTimeout(2000);  // simple wait for list to load
 
-        DashboardManager.log("   -> Searching for Project: " + reqName);
-        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(reqName));
 
-        // Verify Project Status (Interviewing)
-        Locator interviewingBadge = projectRow.locator("span.text-project-interviewing");
-        if (interviewingBadge.isVisible()) {
-            DashboardManager.log("      ✅ Project Status: Interviewing");
+        // 🚀 FIX: Strip Admin prefix here as well
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
+
+        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+
+        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
+
+        if (projectTitle.count() == 0) {
+            DashboardManager.log("      ❌ Project '" + cleanName + "' not found on Projects page!");
         } else {
-            DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
+            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+            projectTitle.first().click();
+            page.waitForTimeout(2000);
         }
 
-        projectRow.locator("h3").click();
-        page.waitForTimeout(2000);
 
-        // 3. Verify Candidate Status & Open (Status should now be Assignment Completed)
         DashboardManager.log("   -> Opening Candidate 1...");
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
 
@@ -443,20 +466,16 @@ public class ScheduleAssignmentPage {
         candidateRow.click();
         page.waitForTimeout(2000);
 
-        // 4. Go to Assignment Tab (Targeting the specific tab container to avoid clicking the progress bar)
         DashboardManager.log("   -> Switching to Assignment Tab...");
         Locator assignmentTab = page.locator("div.flex.items-center.gap-8 div.py-3").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Assignment$")));
         assignmentTab.click();
         page.waitForTimeout(2000);
 
-        // 5. Print Details and Verify Final Status
         DashboardManager.log("   🔍 Verifying Final Assignment Details...");
         Locator assignmentDataRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("SSW"));
 
         if (assignmentDataRow.isVisible()) {
-            // Check for the green "Assignment Completed" badge
             Locator finalStatusBadge = assignmentDataRow.locator("span.status-green-text").filter(new Locator.FilterOptions().setHasText("Assignment Completed"));
-
             if (finalStatusBadge.isVisible()) {
                 DashboardManager.log("      ✅ Assignment Completed | Details: " + assignmentDataRow.innerText().replace("\n", " | "));
             } else {

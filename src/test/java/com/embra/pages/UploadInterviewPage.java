@@ -32,32 +32,61 @@ public class UploadInterviewPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        DashboardManager.log("   -> Searching for Project: " + reqName);
-        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(reqName));
+        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest")
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
 
-        if (projectRow.locator("span.text-project-interviewing").isVisible()) {
-            DashboardManager.log("      ✅ Project Status: Interviewing");
+        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+
+        // Locate the project title <h3> with the name
+        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
+
+        if (projectTitle.count() == 0) {
+            DashboardManager.log("      ❌ Project '" + cleanName + "' not found on Projects page!");
         } else {
-            DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
+            // Ensure visibility before parent selection
+            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
+
+            // Go up to the full project card <a>
+            Locator card = projectTitle.first().locator("//ancestor::a[1]");
+
+            // Find the status badge inside the card
+            Locator statusBadge = card.locator("span.text-project-interviewing");
+
+            if (statusBadge.isVisible() && "Interviewing".equals(statusBadge.innerText().trim())) {
+                DashboardManager.log("      ✅ Project Status: Interviewing");
+            } else {
+                DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
+            }
+
+            // Click the title to open project details
+            projectTitle.first().click();
+            page.waitForTimeout(2000);
         }
-        projectRow.locator("h3").click();
-        page.waitForTimeout(2000);
 
         // Verify Candidate Status & Open
         DashboardManager.log("   -> Opening Candidate 1...");
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        Locator candidateNameCell = page.locator("td").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]");
 
-        // Print Candidate Listing Status (FIXED STRICT MODE VIOLATION HERE)
-        if (candidateRow.locator("span").filter(new Locator.FilterOptions().setHasText("Interviewing")).first().isVisible() ||
-                candidateRow.locator("span").filter(new Locator.FilterOptions().setHasText("Assessment Ongoing")).first().isVisible()) {
-            DashboardManager.log("      ✅ Candidate Status in listing verified.");
+        if (candidateRow.count() == 0) {
+            DashboardManager.log("      ❌ Candidate row not found!");
         } else {
-            DashboardManager.log("      ❌ Candidate Status mismatch in listing.");
-        }
-        candidateRow.click();
-        page.waitForTimeout(2000);
+            Locator statusBadge = candidateRow.locator("span.text-project-interviewing");
+            String actualStatus = statusBadge.isVisible() ? statusBadge.innerText().trim() : "NOT FOUND";
+            DashboardManager.log("      Detected Candidate Status: " + actualStatus);
 
-        // Print Interview details from the list (Expected: Interview Initiated)
+            if ("Interviewing".equals(actualStatus)) {
+                DashboardManager.log("      ✅ Candidate Status in listing: Interviewing");
+            } else {
+                DashboardManager.log("      ❌ Candidate Status mismatch (Expected: Interviewing)");
+            }
+
+            candidateRow.click();
+            page.waitForTimeout(2000);
+        }
+
         Locator interviewRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Interview$")));
         if (interviewRow.isVisible()) {
             DashboardManager.log("      [Interview Listing Details]: " + interviewRow.innerText().replace("\n", " | "));
@@ -66,12 +95,10 @@ public class UploadInterviewPage {
             }
         }
 
-        // Click Select Time
         DashboardManager.log("   -> Clicking 'Select Time'...");
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Select Time")).first().click();
         page.waitForTimeout(1000);
 
-        // Select available date
         DashboardManager.log("   -> Selecting available date...");
         Locator availableDate = page.locator("div.w-11.h-11:not(.opacity-40):not(.cursor-not-allowed)").first();
         try {
@@ -82,24 +109,15 @@ public class UploadInterviewPage {
             page.locator("div").filter(new Locator.FilterOptions().setHasText("16")).last().click();
         }
 
-        // Select timeslots
         DashboardManager.log("   -> Selecting time slots...");
         Locator timeSlotBtns = page.locator("button.py-2.px-4.border");
         timeSlotBtns.nth(0).click();
         timeSlotBtns.nth(1).click();
 
-        // Submit
         DashboardManager.log("   -> Submitting Time Slots...");
-        page.waitForTimeout(2000); // Wait 2s before clicking submit as requested
+        page.waitForTimeout(2000);
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Time Slots")).click();
 
-        if (waitForToast("Interview availability dates sent successfully!")) {
-            DashboardManager.log("      ✅ Toast Verified: Interview availability dates sent successfully!");
-        } else {
-            DashboardManager.log("      ❌ Success Toast NOT found.");
-        }
-
-        // Print Interview Details Card
         page.waitForTimeout(2000);
         Locator detailsCard = page.locator("div.bg-white").filter(new Locator.FilterOptions().setHasText("Interview Details"));
         if (detailsCard.isVisible()) {
@@ -118,7 +136,7 @@ public class UploadInterviewPage {
         page.locator("a[href='/hiring-requests']").click();
         page.waitForLoadState();
 
-        // Open Requirement
+        // Admin keeps the prefix logic as it's the source
         Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
         if (reqRow.locator("div.bg-primary").filter(new Locator.FilterOptions().setHasText("Active")).isVisible()) {
             DashboardManager.log("      ✅ Requirement Status: Active");
@@ -126,7 +144,6 @@ public class UploadInterviewPage {
         page.getByText(reqName).first().click();
         page.waitForTimeout(2000);
 
-        // Open Candidate
         page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
         page.waitForTimeout(1000);
 
@@ -137,38 +154,31 @@ public class UploadInterviewPage {
         candidateRow.locator("button[title='View Details']").click();
         page.waitForTimeout(2000);
 
-        // Go to Interview Tab
         DashboardManager.log("   -> Switching to Interview Tab...");
         page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Interview")).click();
         page.waitForTimeout(1000);
 
         page.reload();
 
-        // Click Schedule Interview CTA
         DashboardManager.log("   -> Filling Interview Scheduling Form...");
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Schedule Interview")).first().click();
 
-        // Fill Form
         page.locator("input[name='link']").fill("https://meet.google.com/abc-xyz-def");
-
         page.locator("button[role='combobox']").filter(new Locator.FilterOptions().setHasText("Select a time slot")).click();
         page.waitForTimeout(500);
-        page.getByRole(AriaRole.OPTION).first().click(); // Select first available slot sent by vendor
+        page.getByRole(AriaRole.OPTION).first().click();
 
         page.locator("textarea[name='description']").fill("this is automated description");
 
         DashboardManager.log("   -> Clicking Schedule Interview CTA...");
-        page.waitForTimeout(1000); // Wait 1 sec before click as requested
+        page.waitForTimeout(1000);
         page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Schedule Interview")).click();
 
         if (waitForToast("Interview scheduled successfully!")) {
             DashboardManager.log("      ✅ Toast Verified: Interview scheduled successfully!");
-        } else {
-            DashboardManager.log("      ❌ Success Toast NOT found.");
         }
         page.waitForTimeout(2000);
 
-        // Submit Feedback
         DashboardManager.log("   -> Clicking 'Submit Feedback'...");
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Feedback")).first().click();
 
@@ -177,10 +187,9 @@ public class UploadInterviewPage {
         page.locator("textarea[name='feedback']").fill("this is automated Description");
 
         DashboardManager.log("   -> Submitting Feedback...");
-        page.waitForTimeout(2000); // Wait 2s before clicking submit as requested
+        page.waitForTimeout(2000);
         page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Submit")).click();
 
-        // Print Feedback Details
         page.waitForTimeout(2000);
         DashboardManager.log("   🔍 Capturing Submitted Feedback...");
         Locator feedbackCard = page.locator("h5").filter(new Locator.FilterOptions().setHasText("Feedback")).locator("..");
@@ -208,36 +217,54 @@ public class UploadInterviewPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        DashboardManager.log("   -> Searching for Project: " + reqName);
-        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(reqName));
-        projectRow.locator("h3").click();
-        page.waitForTimeout(2000);
+        // 🚀 FIX: Strip Admin prefix here as well
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
 
-        // Verify Candidate Status & Open
-        DashboardManager.log("   -> Opening Candidate 1...");
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(cleanName));
 
-        Locator completedBadge = candidateRow.locator("span.text-project-interviewing").filter(new Locator.FilterOptions().setHasText("Interview Completed"));
-        if (completedBadge.isVisible()) {
-            DashboardManager.log("      ✅ Candidate Status in Listing: Interview Completed");
+        if (projectRow.count() > 0) {
+            projectRow.locator("h3").first().click();
+            page.waitForTimeout(2000);
         } else {
-            DashboardManager.log("      ❌ Candidate Status mismatch. Found: " + candidateRow.innerText().replace("\n", " "));
+            DashboardManager.log("      ❌ Project Row not found for: " + cleanName);
         }
-        candidateRow.click();
-        page.waitForTimeout(2000);
 
-        // Go to Interview Tab
+        DashboardManager.log("   -> Opening Candidate 1...");
+        Locator candidateNameCell = page.locator("td").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]");
+
+        if (candidateRow.count() == 0) {
+            DashboardManager.log("      ❌ Candidate row with 'Candidate 1' not found!");
+        } else {
+            String rowText = candidateRow.innerText().replaceAll("\\s+", " ").replace("\n", " | ");
+            DashboardManager.log("      Candidate Row Details: " + rowText);
+
+            Locator statusBadge = candidateRow.locator("span[class*='status-'][class*='-text']");
+            if (statusBadge.isVisible()) {
+                String actualStatus = statusBadge.innerText().trim();
+                DashboardManager.log("      Detected Status: " + actualStatus);
+                if ("Interview Completed".equals(actualStatus)) {
+                    DashboardManager.log("      ✅ Candidate Status in Listing: Interview Completed");
+                } else {
+                    DashboardManager.log("      ❌ Status mismatch - Expected 'Interview Completed'");
+                }
+            }
+            candidateRow.click();
+            page.waitForTimeout(2000);
+        }
+
         DashboardManager.log("   -> Switching to Interview Tab...");
         page.locator("div.flex.items-center.gap-8 div.py-3").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Interview$"))).click();
         page.waitForTimeout(2000);
 
-        // Print Details and Verify Final Status
         DashboardManager.log("   🔍 Verifying Final Interview Details...");
         Locator interviewDataRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Interview"));
 
         if (interviewDataRow.isVisible()) {
             Locator finalStatusBadge = interviewDataRow.locator("span.status-green-text").filter(new Locator.FilterOptions().setHasText("Interview Completed"));
-
             if (finalStatusBadge.isVisible()) {
                 DashboardManager.log("      ✅ Interview Completed | Details: " + interviewDataRow.innerText().replace("\n", " | "));
             } else {

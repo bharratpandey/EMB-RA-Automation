@@ -52,6 +52,8 @@ public class CreateRequirementPage {
                 DashboardManager.log("🔄 Processing Requirement #" + (i + 1));
                 DashboardManager.log("-------------------------------------------------");
 
+                page.reload();
+
                 if (i > 0) {
                     DashboardManager.log("   Clicking 'Add New Requirement' button...");
                     scrollToElement(addNewRequirementBtn);
@@ -101,10 +103,11 @@ public class CreateRequirementPage {
             long uniqueId = Instant.now().toEpochMilli();
             String title = "ReqTest-" + uniqueId;
 
+
             DashboardManager.log("   [Block " + index + "] Filling Basic Details...");
             base.locator("input[name='title']").fill(title);
             base.locator("input[name='clientName']").fill("Client-Automated");
-            base.locator("input[name='clientEmail']").fill("auto@test.com");
+            base.locator("input[name='clientEmail']").fill("autoTest@yopmail.com");
             DashboardManager.log("      -> Title set to: " + title);
 
             DashboardManager.log("   [Block " + index + "] Selecting Domain: Frontend Engineer");
@@ -112,46 +115,59 @@ public class CreateRequirementPage {
                     .filter(new Locator.FilterOptions().setHasText("Select domain")), "Frontend Engineer");
 
             DashboardManager.log("   [Block " + index + "] Filling Experience/Resources...");
-            base.locator("input[name='numberOfPeople']").fill("4");
+            base.locator("input[name='numberOfPeople']").fill("2");
             base.locator("input[name='min_experience']").fill("3");
             base.locator("input[name='experience']").fill("5");
 
-            DashboardManager.log("   [Block " + index + "] Setting Engagement Type: " + (data.contractual ? "Contractual" : "Full Time"));
-            Locator engType = base.getByRole(AriaRole.COMBOBOX)
+            // LOGIC FOR ENGAGEMENT TYPES
+            DashboardManager.log("   [Block " + index + "] Setting Engagement Type: " + data.engagementType);
+            Locator engTypeTrigger = base.getByRole(AriaRole.COMBOBOX)
                     .filter(new Locator.FilterOptions().setHasText("Engagement Type"));
 
-            if (data.contractual) {
-                selectFromDropdown(engType, "Contractual");
-                base.locator("input[name='duration']").fill("6 Months");
+            selectFromDropdown(engTypeTrigger, data.engagementType);
 
-                DashboardManager.log("   [Block " + index + "] Selecting Currency & Budget Type (Contractual)");
-                selectFromDropdown(base.getByRole(AriaRole.COMBOBOX)
-                        .filter(new Locator.FilterOptions().setHasText("Currency")), "India");
+            if (data.engagementType.equalsIgnoreCase("Contractual")) {
+                DashboardManager.log("      -> Filling fields for Contractual...");
+                base.locator("input[name='duration']").fill("9");
 
                 selectFromDropdown(base.getByRole(AriaRole.COMBOBOX)
-                        .filter(new Locator.FilterOptions().setHasText("Budget Type")), "Monthly");
+                        .filter(new Locator.FilterOptions().setHasText("Select budget type")), "Monthly");
 
-                base.locator("input[name='budgetMin']").fill("400000");
-                base.locator("input[name='budgetMax']").fill("500000");
-            } else {
-                selectFromDropdown(engType, "Full Time");
-
-                DashboardManager.log("   [Block " + index + "] Selecting Currency (Full Time)");
                 selectFromDropdown(base.getByRole(AriaRole.COMBOBOX)
-                        .filter(new Locator.FilterOptions().setHasText("Currency")), "India");
+                        .filter(new Locator.FilterOptions().setHasText("Select currency")), "India (₹)");
 
-                base.locator("input[name='budgetMin']").fill("400000");
-                base.locator("input[name='budgetMax']").fill("500000");
+                base.locator("input[name='budgetMin']").fill("1200000");
+                base.locator("input[name='budgetMax']").fill("1500000");
+
+            } else if (data.engagementType.equalsIgnoreCase("Contract To Hire")) {
+                DashboardManager.log("      -> Filling fields for Contract To Hire...");
+                base.locator("input[name='duration']").fill("9");
+
+                selectFromDropdown(base.getByRole(AriaRole.COMBOBOX)
+                        .filter(new Locator.FilterOptions().setHasText("Select currency")), "India (₹)");
+
+                base.locator("input[name='budgetMin']").fill("1200000");
+                base.locator("input[name='budgetMax']").fill("1500000");
+
+            } else { // Full Time
+                DashboardManager.log("      -> Filling fields for Full Time...");
+                selectFromDropdown(base.getByRole(AriaRole.COMBOBOX)
+                        .filter(new Locator.FilterOptions().setHasText("Select currency")), "India (₹)");
+
+                base.locator("input[name='budgetMin']").fill("1200000");
+                base.locator("input[name='budgetMax']").fill("1500000");
             }
 
             page.waitForTimeout(500);
 
-            DashboardManager.log("   [Block " + index + "] Setting Mode: " + (data.onsite ? "Onsite" : "Remote"));
+            // UPDATED LOGIC FOR ENGAGEMENT MODE
+            DashboardManager.log("   [Block " + index + "] Setting Mode: " + data.engagementMode);
             Locator mode = base.getByRole(AriaRole.COMBOBOX)
                     .filter(new Locator.FilterOptions().setHasText("Select mode of engagement"));
-            selectFromDropdown(mode, data.onsite ? "Onsite" : "Remote");
+            selectFromDropdown(mode, data.engagementMode);
 
-            if (data.onsite) {
+            // Onsite and Hybrid share the same flow (Location selection)
+            if (data.engagementMode.equalsIgnoreCase("Onsite") || data.engagementMode.equalsIgnoreCase("Hybrid")) {
                 DashboardManager.log("   [Block " + index + "] Triggering Location Selection...");
                 selectServiceableLocation(base);
             } else {
@@ -212,7 +228,6 @@ public class CreateRequirementPage {
         searchInput.fill("Delhi");
         page.waitForTimeout(1500);
 
-        // Uses XPath for precise parent-child relationship finding
         Locator exactCheckbox = dialog.locator("xpath=//span[text()='Delhi, India']/..//button[@role='checkbox']");
 
         if (exactCheckbox.isVisible()) {
@@ -338,14 +353,11 @@ public class CreateRequirementPage {
         Locator valBtn = scope.getByRole(AriaRole.BUTTON).filter(new Locator.FilterOptions().setHasText("Validate"));
         safeClick(valBtn);
 
-        // --- NEW: Wait for 3 seconds after clicking Validate ---
         DashboardManager.log("      ⏳ Waiting 2 seconds for validation processing...");
         page.waitForTimeout(2000);
 
         return waitForRoleValidationResult(scope);
-
     }
-
 
     private String waitForRoleValidationResult(Locator scope) {
         try {
@@ -392,46 +404,38 @@ public class CreateRequirementPage {
         } catch (Exception ignored) { }
     }
 
-    // --- DATA CLASS ---
+    // --- UPDATED DATA CLASS ---
     public static class RequirementData {
-        public boolean contractual;
-        public boolean onsite;
+        public String engagementType;
+
+        public String engagementMode; // Changed from boolean onsite to String
         public String primarySkill;
         public String preferredSkill;
         public String roleId;
         public String jdFilePath;
 
-        public RequirementData(boolean c, boolean o, String p, String s, String r, String j) {
-            this.contractual = c;
-            this.onsite = o;
+        public RequirementData(String eType, String eMode, String p, String s, String r, String j) {
+            this.engagementType = eType;
+            this.engagementMode = eMode;
             this.primarySkill = p;
             this.preferredSkill = s;
             this.roleId = r;
             this.jdFilePath = j;
         }
     }
-    // ──────────────────────────────────────────────────────────────
-    // NEW: CAPTURE STATUS OF CREATED REQUIREMENTS
-    // ──────────────────────────────────────────────────────────────
+
     public void verifyRequirementStatuses() {
         DashboardManager.log("\n=================================================");
         DashboardManager.log("🔍 VERIFYING STATUS OF CREATED REQUIREMENTS");
         DashboardManager.log("=================================================");
 
         try {
-            // 1. Wait for the URL to change to the listing page (or wait for the table)
-            // Assuming after creation it redirects to /client or similar
             page.waitForTimeout(3000);
-
-            // 2. Locate the status badges in the first 4 rows
-            // Selector targets the div containing the text 'Active', 'Pending', etc. inside the table cell
             Locator statusBadges = page.locator("td div.inline-flex.items-center.rounded-full");
-
-            // Wait for at least one status to be visible
             statusBadges.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
 
             int count = statusBadges.count();
-            int limit = Math.min(count, 4); // We only care about the top 4 we just created
+            int limit = Math.min(count, 1);
 
             if (count == 0) {
                 DashboardManager.log("❌ No requirement statuses found in the table!");

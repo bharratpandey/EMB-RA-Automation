@@ -79,9 +79,6 @@ public class OfferJobPage {
         DashboardManager.log("   -> Opening Candidate: " + candidateName);
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
 
-        // Verify Listing Status "Interview Completed"
-        // Note: Depending on where the status is located in your specific table row structure
-        // we check broadly inside the row first.
         if (candidateRow.innerText().contains("Interview Completed")) {
             DashboardManager.log("      ✅ Candidate Status in Listing: Interview Completed");
         }
@@ -121,13 +118,33 @@ public class OfferJobPage {
         deployTriggerBtn.click();
         page.waitForTimeout(1000);
 
-        // Date Selection
+        // 1. Engagement Start Date Selection
         DashboardManager.log("   -> Selecting Engagement Start Date...");
-        engagementStartDateBtn.click();
-        Locator calendar = page.locator("div.rdp-month");
-        calendar.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        // Pick first available date
+        engagementStartDateBtn.first().click();
+
+        // FIX: Use .first() to target the currently active calendar popup
+        Locator startCalendar = page.locator("div.rdp-month").first();
+        startCalendar.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         page.locator("button.rdp-day:not([disabled])").first().click();
+
+        // 2. Conditional Logic for Engagement End Date
+        Locator endDateLabel = page.locator("label").filter(new Locator.FilterOptions().setHasText("Engagement End Date"));
+        if (endDateLabel.isVisible()) {
+            DashboardManager.log("   -> Engagement End Date field visible (Contractual). Selecting date...");
+
+            Locator endDateBtn = page.locator("div.flex-col").filter(new Locator.FilterOptions().setHas(endDateLabel)).locator("button");
+            endDateBtn.click();
+
+            // FIX: Use .last() and a small timeout to ensure the second calendar is targeted
+            page.waitForTimeout(500);
+            Locator endCalendar = page.locator("div.rdp-month").last();
+            endCalendar.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+
+            page.locator("button.rdp-day:not([disabled])").last().click();
+            DashboardManager.log("      ✅ Engagement End Date Selected.");
+        } else {
+            DashboardManager.log("   ℹ️ Engagement End Date not visible (Full Time). Skipping.");
+        }
 
         // Costs
         DashboardManager.log("   -> Filling Financial Details...");
@@ -138,7 +155,6 @@ public class OfferJobPage {
         DashboardManager.log("   -> Uploading Documents...");
         try {
             fileInput.setInputFiles(Paths.get(filePath));
-            // Wait for upload success toast
             if (waitForToast("uploaded successfully")) {
                 DashboardManager.log("      ✅ Document Uploaded.");
             }
@@ -186,26 +202,28 @@ public class OfferJobPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        DashboardManager.log("   -> Searching for Project: " + reqName);
-        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(reqName));
+        // 🚀 FIX: Strip Admin prefix if it exists (removes "AUTxx - ")
+        String cleanName = reqName.contains("ReqTest-")
+                ? reqName.substring(reqName.indexOf("ReqTest-"))
+                : reqName;
 
-        // Verify "Interviewing" (Vendor project status often stays as Interviewing until fully closed)
+        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+        Locator projectRow = page.locator("div.flex-row.justify-between").filter(new Locator.FilterOptions().setHasText(cleanName));
+
         if (projectRow.locator("span.text-project-interviewing").isVisible()) {
             DashboardManager.log("      ✅ Project Status: Interviewing");
         }
 
-        projectRow.locator("h3").click();
+        projectRow.locator("h3").first().click();
         page.waitForTimeout(2000);
 
         // Verify Candidate Listing
         DashboardManager.log("   -> Checking Candidate Listing...");
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
 
-        // The prompt asked to verify "Interview Completed" in listing before clicking
         if (candidateRow.locator("span.text-project-interviewing").filter(new Locator.FilterOptions().setHasText("Interview Completed")).isVisible()) {
             DashboardManager.log("      ✅ Listing Status: Interview Completed");
         } else {
-            // Fallback check in case it updated instantly
             DashboardManager.log("      ℹ️ Listing status might have updated. Proceeding to details...");
         }
 
