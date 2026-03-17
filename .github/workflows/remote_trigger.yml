@@ -6,10 +6,26 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
     steps:
+      # 1. Get the code
       - uses: actions/checkout@v4
+
+      # 2. Setup Java (Change '17' to '11' or '21' if your project requires it)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # 3. Install Browsers (CRITICAL if your test opens a web UI)
+      - name: Install Browsers & Dependencies
+        run: npx playwright install --with-deps
+
+      # 4. Run the actual test
       - name: Run Test
         run: |
-          mvn test -Dtest=${{ github.event.client_payload.test_name }} \
+          # The **/ ensures Maven finds the file even if it's deep in a package
+          mvn test -Dtest=**/${{ github.event.client_payload.test_name }} \
                    -Drun_id=${{ github.event.client_payload.run_id }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
