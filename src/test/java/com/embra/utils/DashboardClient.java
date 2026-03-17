@@ -1,4 +1,4 @@
-package utils;
+package com.embra.utils;
 
 import java.net.URI;
 import java.net.http.HttpClient;
