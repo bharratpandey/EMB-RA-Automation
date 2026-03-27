@@ -64,6 +64,11 @@ public class SubmitCandidatePage {
     private final Locator certDateInput;
     private final Locator certDescInput;
     private final Locator certUploadInput;
+
+    // NEW LOCATORS FOR EXPIRED CERTIFICATE
+    private final Locator certExpiredCheckbox;
+    private final Locator certExpiryDateInput;
+
     private final Locator saveCertBtn;
 
     // Education Locators (NEW)
@@ -130,6 +135,10 @@ public class SubmitCandidatePage {
         this.certDateInput = page.locator("input[name='issued_date']");
         this.certDescInput = page.locator("textarea[name='description']").last();
         this.certUploadInput = page.locator("input[type='file']").last();
+
+        // INITIALIZING NEW EXPIRED CERTIFICATE LOCATORS
+        this.certExpiredCheckbox = page.locator("button#expired[role='checkbox']");
+        this.certExpiryDateInput = page.locator("input[name='expiry_date']");
         this.saveCertBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Save Certificate"));
 
         // Education (NEW)
@@ -376,9 +385,11 @@ public class SubmitCandidatePage {
 
     private void fillMemberDetails(String jdPath, String candidateName) {
         DashboardManager.log("      📤 Uploading Resume...");
+
         try {
             if (!Files.exists(Paths.get(jdPath))) throw new RuntimeException("Resume file not found!");
             jdUploadInput.setInputFiles(Paths.get(jdPath));
+            page.waitForTimeout(2000);
             importResumeBtn.click();
             DashboardManager.log("      ⏳ Waiting 15s for extraction...");
             page.waitForTimeout(15000);
@@ -437,10 +448,18 @@ public class SubmitCandidatePage {
             certDateInput.fill("2025-05-12");
             certDescInput.fill("Automated Cert Description");
             certUploadInput.setInputFiles(Paths.get(jdPath));
+
+            // ---> NEW EXPIRED LOGIC ADDED HERE <---
+            DashboardManager.log("         -> Checking 'expired' box and filling expiry date...");
+            certExpiredCheckbox.click();
+            page.waitForTimeout(500);
+            certExpiryDateInput.fill("2032-12-20"); // Adjusted format for standard date input type
+            // --------------------------------------
+
             saveCertBtn.click();
             saveCertBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN).setTimeout(5000));
             page.waitForTimeout(2000);
-            DashboardManager.log("      ✅ Certificate Added.");
+            DashboardManager.log("      ✅ Certificate Added (With Expiry).");
         } catch (Exception e) {
             DashboardManager.log("      ❌ Failed to add Certificate: " + e.getMessage());
         }
@@ -529,7 +548,18 @@ public class SubmitCandidatePage {
             page.getByText("Submitted successful!", new Page.GetByTextOptions().setExact(false))
                     .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
 
-            // 3. 🚀 CRITICAL WAIT: Wait for the candidates to actually appear with "Applied" status
+            // 3. ⏳ WAIT FOR 20 SECONDS
+            DashboardManager.log("      ⏳ Waiting 20 seconds before switching to Interview tab...");
+            page.waitForTimeout(26000);
+
+            // 4. Click on the Interview Tab (using the specific class and text)
+            DashboardManager.log("      🖱 Clicking on the 'Interview' tab...");
+            page.locator("div.cursor-pointer")
+                    .filter(new Locator.FilterOptions().setHasText("Interview"))
+                    .first()
+                    .click();
+
+            // 5. 🚀 CRITICAL WAIT: Wait for the candidates to actually appear with "Applied" status
             // We target the status badge specifically with a 45-second timeout
             DashboardManager.log("      ⏳ Waiting for candidates to become visible in the table (Max 45s)...");
 
@@ -541,7 +571,7 @@ public class SubmitCandidatePage {
 
             DashboardManager.log("      ✅ Candidates are now visible and processed.");
 
-            // 4. Final small buffer to ensure all rows in the batch have finished rendering
+            // 6. Final small buffer to ensure all rows in the batch have finished rendering
             page.waitForTimeout(2000);
 
         } catch (Exception e) {

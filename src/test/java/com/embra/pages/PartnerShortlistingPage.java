@@ -15,7 +15,10 @@ public class PartnerShortlistingPage {
     // ──────────────────────────────────────────────────────────────
     // LOCATORS
     // ──────────────────────────────────────────────────────────────
-    private final Locator firstViewDetailsBtn;
+    // Renamed this to represent the overall search button
+    private final Locator listSearchFilterBtn;
+    private final Locator listSearchInput;
+
     private final Locator statusBadge;
     private final Locator partnerShortlistingTab;
     private final Locator searchFilterBtn;
@@ -26,8 +29,10 @@ public class PartnerShortlistingPage {
     public PartnerShortlistingPage(Page page) {
         this.page = page;
 
-        // 1. View Details (Eye Icon) - First one in list
-        this.firstViewDetailsBtn = page.locator("button[title='View Details']").first();
+        // 1. Requirement Listing Page Locators
+        // The first Search & Filters bar on the main listing page
+        this.listSearchFilterBtn = page.locator("div.font-semibold").filter(new Locator.FilterOptions().setHasText("Search & Filters")).first();
+        this.listSearchInput = page.locator("input[placeholder='Search by client name, budget, title, email ...']");
 
         // 2. Status Badge
         this.statusBadge = page.locator("div.px-4.py-1.rounded-md.font-bold");
@@ -35,7 +40,7 @@ public class PartnerShortlistingPage {
         // 3. Tabs
         this.partnerShortlistingTab = page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Partner Shortlisting"));
 
-        // 4. Search Section
+        // 4. Partner Search Section (Inside the Details page)
         this.searchFilterBtn = page.locator("div").filter(new Locator.FilterOptions().setHasText("Search & Filters")).last();
         this.searchInput = page.locator("input[placeholder='Search active partners...']");
 
@@ -49,14 +54,37 @@ public class PartnerShortlistingPage {
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Opens the first requirement from the listing page.
+     * Clicks Search & Filters, searches for the specific requirement, and opens it.
      */
-    public void openFirstRequirement() {
-        DashboardManager.log("👉 Opening first requirement...");
-        firstViewDetailsBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        firstViewDetailsBtn.click();
-    }
+    public void searchAndOpenRequirement(String requirementName) {
+        DashboardManager.log("👉 Opening Search & Filters for Requirement...");
 
+        // 1. Click Search & Filters to expand
+        listSearchFilterBtn.click();
+
+        // 2. Wait for the input field to be visible and type the name
+        listSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        DashboardManager.log("🔎 Searching for Requirement: " + requirementName);
+        listSearchInput.fill(requirementName);
+
+        // 3. Wait a moment for the table to filter
+        page.waitForTimeout(2000);
+
+        // 4. Find the row that contains the requirement name
+        Locator requirementRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(requirementName));
+
+        // 5. Click the "View Details" (eye icon) button inside that specific row
+        Locator viewDetailsBtn = requirementRow.locator("button[title='View Details']");
+
+        if (viewDetailsBtn.count() > 0) {
+            DashboardManager.log("   ✅ Requirement found. Clicking View Details...");
+            viewDetailsBtn.first().click();
+        } else {
+            DashboardManager.log("   ⚠️ View Details button not found. Trying to click the Requirement Name link directly...");
+            // Fallback: Click the link text directly if the eye icon isn't found
+            requirementRow.locator("a").first().click();
+        }
+    }
     /**
      * Verifies requirement status.
      * WAITS for 'Active' to appear. If not, prints actual status and proceeds.

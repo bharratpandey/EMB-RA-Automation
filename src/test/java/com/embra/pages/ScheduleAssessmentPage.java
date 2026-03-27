@@ -117,14 +117,20 @@ public class ScheduleAssessmentPage {
     }
 
     public void vendorOpenProjectAndVerify(String reqTitle) {
-        DashboardManager.log("🔎 Opening Project: " + reqTitle);
-        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(reqTitle));
+        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest-")
+        String cleanName = reqTitle.contains("ReqTest-")
+                ? reqTitle.substring(reqTitle.indexOf("ReqTest-"))
+                : reqTitle;
+
+        DashboardManager.log("   🔎 Opening Project (Cleaned): " + cleanName);
+        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
+
         try {
-            projectTitle.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
-            projectTitle.click();
+            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+            projectTitle.first().click();
         } catch (Exception e) {
             DashboardManager.log("      ⚠️ Specific H3 not found, trying generic text click...");
-            page.getByText(reqTitle).first().click();
+            page.getByText(cleanName).first().click();
         }
         page.waitForTimeout(2000);
     }

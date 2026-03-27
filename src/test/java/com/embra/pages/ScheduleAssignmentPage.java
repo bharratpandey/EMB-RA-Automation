@@ -384,10 +384,10 @@ public class ScheduleAssignmentPage {
             DashboardManager.log("      ⚠️ Could not print assignment details: " + e.getMessage());
         }
 
-        page.waitForTimeout(1800);
-        DashboardManager.log("   -> Clicking 'Submit Feedback'...");
-        Locator submitFeedbackBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Feedback")).first();
-        submitFeedbackBtn.click();
+        // 🚀 CHANGED: Click the 'Select' CTA button using strict CSS classes to avoid dropdowns
+        DashboardManager.log("   -> Clicking 'Select' CTA...");
+        Locator selectCtaBtn = page.locator("button.text-green-700.border-green-400").filter(new Locator.FilterOptions().setHasText("Select")).first();
+        selectCtaBtn.click();
 
         DashboardManager.log("   -> Filling Feedback Reason...");
         Locator feedbackTextarea = page.locator("textarea[placeholder='Enter your feedback reason...']");

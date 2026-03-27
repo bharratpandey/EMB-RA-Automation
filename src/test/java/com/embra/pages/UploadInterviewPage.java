@@ -179,8 +179,12 @@ public class UploadInterviewPage {
         }
         page.waitForTimeout(2000);
 
-        DashboardManager.log("   -> Clicking 'Submit Feedback'...");
-        page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Feedback")).first().click();
+        // 🚀 CHANGED: Click the new 'Select' CTA button before filling feedback
+        DashboardManager.log("   -> Clicking 'Select' CTA...");
+        Locator selectCtaBtn = page.locator("button.text-green-700.border-green-400").filter(new Locator.FilterOptions().setHasText("Select")).first();
+        selectCtaBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+        selectCtaBtn.click();
+        page.waitForTimeout(1000);
 
         DashboardManager.log("   -> Filling Feedback...");
         page.locator("input[name='score']").fill("79");

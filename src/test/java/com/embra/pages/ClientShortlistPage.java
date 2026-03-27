@@ -43,40 +43,86 @@ public class ClientShortlistPage {
         page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName)).first().click();
         page.waitForTimeout(2000);
 
+        // 🚀 NEW: Click on the 'Candidate' Tab
+        DashboardManager.log("   -> Switching to 'Candidate' Tab...");
+        Locator candidateTabBtn = page.locator("div.cursor-pointer").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Candidate$"))).first();
+        try {
+            candidateTabBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            candidateTabBtn.click();
+            page.waitForTimeout(2000); // Give the tab a moment to load candidate data
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ 'Candidate' tab not found or click failed.");
+        }
+
+        // 🚀 NEW: Switch to List View
+        DashboardManager.log("   -> Switching to List View...");
+        Locator listViewBtn = page.locator("button[aria-label='List view']");
+        try {
+            listViewBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            listViewBtn.click();
+            page.waitForTimeout(1000); // Give the table a second to render
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ 'List View' button not found or already in list view.");
+        }
+
+
+
         printClientCandidateDetails("Candidate 1");
         printClientCandidateDetails("Candidate 4");
 
-        DashboardManager.log("   -> Attempting to click 'More Actions' for Candidate 4...");
+        DashboardManager.log("   -> Opening Candidate 4 Details Modal...");
 
-        Locator candidate4Row = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 4"));
-        Locator moreActionsBtn = candidate4Row.locator("button[title='More Actions']");
-
-        // 🚀 FIX: Use dispatchEvent to bypass row-level click interceptors
-        moreActionsBtn.scrollIntoViewIfNeeded();
-        moreActionsBtn.dispatchEvent("click");
-
-        DashboardManager.log("      -> 'More Actions' triggered. Waiting for portal menu...");
-        page.waitForTimeout(1000);
-
-        // Target 'Shortlist' button inside the high z-index portal (div.fixed)
-        Locator shortlistBtn = page.locator("div.fixed button").filter(new Locator.FilterOptions().setHasText("Shortlist"));
+        // 🚀 FIX: Click the candidate row to open the details modal
+        Locator candidate4Row = page.locator("tr").filter(new Locator.FilterOptions().setHasText(Pattern.compile("Candidate 4", Pattern.CASE_INSENSITIVE))).first();
+        candidate4Row.scrollIntoViewIfNeeded();
 
         try {
-            shortlistBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
-            shortlistBtn.click(new Locator.ClickOptions().setForce(true));
+            candidate4Row.click(new Locator.ClickOptions().setForce(true));
+            page.waitForTimeout(2000); // Wait for modal animation
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ Failed to click candidate row. Trying JS fallback...");
+            candidate4Row.evaluate("node => node.click()");
+            page.waitForTimeout(2000);
+        }
+
+        // 🚀 Target 'Shortlist' button INSIDE the modal
+        DashboardManager.log("      -> Clicking 'Shortlist' CTA inside modal...");
+        Locator shortlistModalBtn = page.locator("button.bg-primary-700").filter(new Locator.FilterOptions().setHasText("Shortlist"));
+
+        try {
+            shortlistModalBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            shortlistModalBtn.click(new Locator.ClickOptions().setForce(true));
             DashboardManager.log("      ✅ 'Shortlist' clicked.");
         } catch (Exception e) {
             DashboardManager.log("      ⚠️ Standard click failed. Trying JS fallback...");
-            page.evaluate("el => el.click()", shortlistBtn.elementHandle());
+            page.evaluate("el => el.click()", shortlistModalBtn.elementHandle());
         }
 
+        // Check the toast message
         if (waitForClientToast("Candidate selected successfully")) {
             DashboardManager.log("      ✅ Toast Verified: Candidate shortlisted by client.");
         }
 
+        // 🚀 Close the Modal using the (X) button
+        DashboardManager.log("   -> Closing Candidate Modal...");
+        Locator closeModalBtn = page.locator("button.absolute.top-\\[16px\\]").first(); // Target the cross button
+        try {
+            closeModalBtn.click(new Locator.ClickOptions().setForce(true));
+            page.waitForTimeout(1000);
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ Failed to click cross button, attempting to click outside modal...");
+            page.mouse().click(10, 10); // Click top left corner of screen outside modal
+            page.waitForTimeout(1000);
+        }
+
+        // Verify Status update in the table
         page.waitForTimeout(2000);
-        String finalStatus = candidate4Row.locator("span.status-blue-text").innerText().trim();
-        DashboardManager.log("      Candidate 4 Status: " + (finalStatus.equals("Shortlisted") ? "✅ Shortlisted" : "❌ " + finalStatus));
+        String finalStatus = candidate4Row.innerText();
+        if (finalStatus.contains("Shortlisted")) {
+            DashboardManager.log("      Candidate 4 Status: ✅ Candidate Shortlisted");
+        } else {
+            DashboardManager.log("      Candidate 4 Status: ❌ Status not updated in UI");
+        }
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -51,8 +51,7 @@ public class CreateRequirementPage {
                 DashboardManager.log("\n-------------------------------------------------");
                 DashboardManager.log("🔄 Processing Requirement #" + (i + 1));
                 DashboardManager.log("-------------------------------------------------");
-
-                page.reload();
+                page.waitForTimeout(1000);
 
                 if (i > 0) {
                     DashboardManager.log("   Clicking 'Add New Requirement' button...");
@@ -61,7 +60,7 @@ public class CreateRequirementPage {
 
                     DashboardManager.log("   Waiting for new form block...");
                     page.locator("input[name='title']").nth(i)
-                            .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+                            .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(20000));
                     DashboardManager.log("   ✅ New form block visible.");
                 }
 

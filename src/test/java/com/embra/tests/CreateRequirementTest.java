@@ -36,8 +36,12 @@ public class CreateRequirementTest {
         if (!Files.exists(jdPath)) Files.write(jdPath, "Dummy PDF content".getBytes());
 
         playwright = Playwright.create();
-        browser = playwright.chromium().launch(
-                new BrowserType.LaunchOptions().setChannel("chrome").setHeadless(false)
+        //browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
+        //        .setHeadless(true)
+        //);
+        browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
+                .setChannel("chrome")  // <--- THIS TELLS PLAYWRIGHT TO USE REAL CHROME
+                .setHeadless(false)
         );
     }
 

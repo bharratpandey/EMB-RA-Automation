@@ -30,7 +30,7 @@ public class VendorAuthTest {
         DashboardClient.log("==================================================");
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                .setHeadless(true)
+                .setHeadless(false)
                 .setSlowMo(300));
     }
 
