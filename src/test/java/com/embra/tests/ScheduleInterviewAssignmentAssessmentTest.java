@@ -687,5 +687,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         DashboardManager.flushReport();
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
+        EmailSender.sendDashboardEmail("Ashish.mishra@emb.global");
     }
 }
