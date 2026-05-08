@@ -40,3 +40,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Secrets — never commit real credentials ###
+.env.claude/

@@ -1,0 +1,51 @@
+name: Prod Sanity
+
+on:
+  # Run manually from the GitHub Actions tab
+  workflow_dispatch:
+  # Or on a schedule — 6:30 AM IST (01:00 UTC) every day
+  schedule:
+    - cron: '0 1 * * *'
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+
+    env:
+      # ── Secrets (set in Settings → Secrets and variables → Actions) ──────────
+      # These are NEVER visible in logs — GitHub masks them automatically
+      UAT_VENDOR_EMAIL:    ${{ secrets.UAT_VENDOR_EMAIL }}
+      UAT_VENDOR_PASSWORD: ${{ secrets.UAT_VENDOR_PASSWORD }}
+      EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
+
+      # ── Non-secret config — safe to inline ───────────────────────────────────
+      UAT_VENDOR_URL:  https://uat-vendor.embtalent.ai/login
+      UAT_REQ_NAME:    Test Sanity Requirement
+      UAT_RESUME_PATH: src/test/resources/Shashikant.pdf
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Install Playwright Browsers & Dependencies
+        run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install --with-deps"
+
+      - name: Run Prod Sanity Test
+        # xvfb-run provides a virtual display so Playwright can run non-headless on Linux
+        run: xvfb-run mvn test -Dtest=ProdSanityTest
+
+      - name: Upload Sanity Report & Traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prod-Sanity-Report
+          path: |
+            target/AutomationDashboard.html
+            traces/

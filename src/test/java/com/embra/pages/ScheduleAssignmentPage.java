@@ -141,6 +141,7 @@ public class ScheduleAssignmentPage {
         scheduleAssignmentCta.click();
 
         DashboardManager.log("   -> Filling Assignment Details...");
+        page.waitForTimeout(2000);
         titleInput.fill("SSW");
         descInput.fill("TEST");
 
@@ -172,6 +173,7 @@ public class ScheduleAssignmentPage {
             page.locator("button.rdp-day:not([disabled])").first().click();
         }
 
+        page.waitForTimeout(2000);
         // Submit
         submitAssignmentBtn.click();
         DashboardManager.log("   -> Submitted Assignment.");
@@ -272,7 +274,13 @@ Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().set
         // 4. Print Assignment Listing Details + Verify Status
         DashboardManager.log("\n      [Vendor Assignment Listing Details]");
         Locator assignmentRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("SSW"));
-        String rowText = assignmentRow.innerText().trim().replaceAll("\\s+", " ");
+        try {
+            assignmentRow.first().waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE).setTimeout(60000));
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ Assignment row 'SSW' not visible after 60s: " + e.getMessage());
+        }
+        String rowText = assignmentRow.first().innerText().trim().replaceAll("\\s+", " ");
         DashboardManager.log("      " + rowText);
         DashboardManager.log("      -------------------------------------\n");
 
