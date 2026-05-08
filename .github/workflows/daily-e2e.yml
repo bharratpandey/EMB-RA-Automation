@@ -34,9 +34,13 @@ jobs:
       - name: Install Playwright Chromium
         run: |
           mvn dependency:resolve --no-transfer-progress
-          PLAYWRIGHT_JAR=$(find ~/.m2/repository/com/microsoft/playwright -name "driver-bundle-*.jar" | head -1)
-          echo "Found Playwright jar: $PLAYWRIGHT_JAR"
-          java -jar $PLAYWRIGHT_JAR install chromium
+          PLAYWRIGHT_JAR=$(find ~/.m2/repository/com/microsoft/playwright/playwright -name "playwright-*.jar" | head -1)
+          DRIVER_JAR=$(find ~/.m2/repository/com/microsoft/playwright/driver -name "driver-*.jar" | head -1)
+          BUNDLE_JAR=$(find ~/.m2/repository/com/microsoft/playwright/driver-bundle -name "driver-bundle-*.jar" | head -1)
+          echo "Playwright: $PLAYWRIGHT_JAR"
+          echo "Driver: $DRIVER_JAR"
+          echo "Bundle: $BUNDLE_JAR"
+          java -cp "$PLAYWRIGHT_JAR:$DRIVER_JAR:$BUNDLE_JAR" com.microsoft.playwright.CLI install chromium
 
       - name: Run Test
         run: mvn test -Dtest=ScheduleInterviewAssignmentAssessmentTest --no-transfer-progress
