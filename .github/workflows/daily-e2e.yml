@@ -32,7 +32,7 @@ jobs:
             libxfixes3 libxrandr2 libgbm1 libasound2t64
 
       - name: Install Playwright Chromium
-        run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
+        run: mvn compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium" -D exec.classpathScope=runtime
 
       - name: Run Test
         run: mvn test -Dtest=ScheduleInterviewAssignmentAssessmentTest --no-transfer-progress
