@@ -32,7 +32,11 @@ jobs:
             libxfixes3 libxrandr2 libgbm1 libasound2t64
 
       - name: Install Playwright Chromium
-        run: mvn compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium" -D exec.classpathScope=runtime
+        run: |
+          mvn dependency:resolve --no-transfer-progress
+          PLAYWRIGHT_JAR=$(find ~/.m2/repository/com/microsoft/playwright -name "driver-bundle-*.jar" | head -1)
+          echo "Found Playwright jar: $PLAYWRIGHT_JAR"
+          java -jar $PLAYWRIGHT_JAR install chromium
 
       - name: Run Test
         run: mvn test -Dtest=ScheduleInterviewAssignmentAssessmentTest --no-transfer-progress
