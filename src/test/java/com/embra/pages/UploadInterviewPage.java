@@ -32,43 +32,44 @@ public class UploadInterviewPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest")
+        // Strip Admin prefix if it exists
         String cleanName = reqName.contains("ReqTest-")
                 ? reqName.substring(reqName.indexOf("ReqTest-"))
                 : reqName;
 
         DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
 
-        // Locate the project title <h3> with the name
-        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
+// Search for the project using the search field
+        Locator searchField = page.locator("input[placeholder='Find a project by: Name, Current status']");
+        searchField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+        searchField.fill(cleanName);
+        page.waitForTimeout(2000);
 
-        if (projectTitle.count() == 0) {
+// Find the project card by cleanName in h3
+        Locator projectCard = page.locator("a").filter(new Locator.FilterOptions()
+                .setHas(page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName)))).first();
+
+        if (projectCard.count() == 0) {
             DashboardManager.log("      ❌ Project '" + cleanName + "' not found on Projects page!");
         } else {
-            // Ensure visibility before parent selection
-            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
-
-            // Go up to the full project card <a>
-            Locator card = projectTitle.first().locator("//ancestor::a[1]");
-
-            // Find the status badge inside the card
-            Locator statusBadge = card.locator("span.text-project-interviewing");
-
+            // Check status badge inside card
+            Locator statusBadge = projectCard.locator("span.text-project-interviewing");
             if (statusBadge.isVisible() && "Interviewing".equals(statusBadge.innerText().trim())) {
                 DashboardManager.log("      ✅ Project Status: Interviewing");
             } else {
                 DashboardManager.log("      ❌ Project Status mismatch (Expected: Interviewing)");
             }
 
-            // Click the title to open project details
-            projectTitle.first().click();
+            // Click the card to open project details
+            projectCard.click();
             page.waitForTimeout(2000);
         }
 
         // Verify Candidate Status & Open
         DashboardManager.log("   -> Opening Candidate 1...");
+
         Locator candidateNameCell = page.locator("td").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
-        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]");
+        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]").first();
 
         if (candidateRow.count() == 0) {
             DashboardManager.log("      ❌ Candidate row not found!");
@@ -99,23 +100,57 @@ public class UploadInterviewPage {
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Select Time")).first().click();
         page.waitForTimeout(1000);
 
+        // 🚀 FIX: Updated to match the custom calendar HTML exactly
         DashboardManager.log("   -> Selecting available date...");
-        Locator availableDate = page.locator("div.w-11.h-11:not(.opacity-40):not(.cursor-not-allowed)").first();
+
+        // Find a div.w-11.h-11 that contains a number but DOES NOT have cursor-not-allowed
+        Locator availableDate = page.locator("div.w-11.h-11:not(.cursor-not-allowed)")
+                .filter(new Locator.FilterOptions().setHasText(Pattern.compile("^\\d+$")))
+                .first();
         try {
+            availableDate.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
             availableDate.click();
-            page.waitForTimeout(1000);
+            page.waitForTimeout(1500); // Wait for slots to load below
         } catch (Exception e) {
-            DashboardManager.log("      ⚠️ Could not click date. Trying fallback...");
-            page.locator("div").filter(new Locator.FilterOptions().setHasText("16")).last().click();
+            DashboardManager.log("      ⚠️ Could not click date on custom calendar. Trying fallback...");
+            page.locator("div.w-11.h-11").filter(new Locator.FilterOptions().setHasText("16")).last().click();
+            page.waitForTimeout(1500);
         }
 
+        // 🚀 FIX: Highly resilient time slot selector
         DashboardManager.log("   -> Selecting time slots...");
-        Locator timeSlotBtns = page.locator("button.py-2.px-4.border");
-        timeSlotBtns.nth(0).click();
-        timeSlotBtns.nth(1).click();
+
+        // Strategy 1: Checkbox + Label format
+        Locator checkboxTimeSlots = page.locator("button[role='checkbox']");
+
+        // Strategy 2: Standard button format
+        Locator buttonTimeSlots = page.locator("button.py-2.px-4.border");
+
+        try {
+            if (checkboxTimeSlots.count() >= 2) {
+                Locator firstLabel = checkboxTimeSlots.nth(0).locator("..").locator("label");
+                Locator secondLabel = checkboxTimeSlots.nth(1).locator("..").locator("label");
+
+                firstLabel.click();
+                DashboardManager.log("      ✅ Selected Slot 1: " + firstLabel.innerText());
+
+                secondLabel.click();
+                DashboardManager.log("      ✅ Selected Slot 2: " + secondLabel.innerText());
+            } else if (buttonTimeSlots.count() >= 2) {
+                buttonTimeSlots.nth(0).click();
+                DashboardManager.log("      ✅ Selected Slot 1 (Button format)");
+
+                buttonTimeSlots.nth(1).click();
+                DashboardManager.log("      ✅ Selected Slot 2 (Button format)");
+            } else {
+                DashboardManager.log("      ❌ Not enough time slots available on this date.");
+            }
+        } catch (Exception e) {
+            DashboardManager.log("      ❌ Time slots did not appear or could not be clicked.");
+        }
 
         DashboardManager.log("   -> Submitting Time Slots...");
-        page.waitForTimeout(2000);
+        page.waitForTimeout(1000);
         page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit Time Slots")).click();
 
         page.waitForTimeout(2000);
@@ -147,7 +182,7 @@ public class UploadInterviewPage {
         page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
         page.waitForTimeout(1000);
 
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
+        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName)).first();
         if (candidateRow.locator("div.text-white").filter(new Locator.FilterOptions().setHasText("Interviewing")).isVisible()) {
             DashboardManager.log("      ✅ Candidate Listing Status: Interviewing");
         }
@@ -179,7 +214,6 @@ public class UploadInterviewPage {
         }
         page.waitForTimeout(2000);
 
-        // 🚀 CHANGED: Click the new 'Select' CTA button before filling feedback
         DashboardManager.log("   -> Clicking 'Select' CTA...");
         Locator selectCtaBtn = page.locator("button.text-green-700.border-green-400").filter(new Locator.FilterOptions().setHasText("Select")).first();
         selectCtaBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
@@ -221,7 +255,6 @@ public class UploadInterviewPage {
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
-        // 🚀 FIX: Strip Admin prefix here as well
         String cleanName = reqName.contains("ReqTest-")
                 ? reqName.substring(reqName.indexOf("ReqTest-"))
                 : reqName;
@@ -237,8 +270,9 @@ public class UploadInterviewPage {
         }
 
         DashboardManager.log("   -> Opening Candidate 1...");
+
         Locator candidateNameCell = page.locator("td").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
-        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]");
+        Locator candidateRow = candidateNameCell.locator("//ancestor::tr[1]").first();
 
         if (candidateRow.count() == 0) {
             DashboardManager.log("      ❌ Candidate row with 'Candidate 1' not found!");

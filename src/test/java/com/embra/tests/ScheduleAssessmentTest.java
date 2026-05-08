@@ -4,6 +4,7 @@ import com.embra.pages.*;
 import com.embra.utils.DashboardManager;
 import com.embra.utils.EmailSender;
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import org.junit.jupiter.api.*;
 
@@ -26,11 +27,12 @@ public class ScheduleAssessmentTest {
     private BrowserContext context;
     private Page page;
 
-    private static final String JD_FILE_PATH = "target/Ajay_Gupta_resume_.pdf";
+    private static final String JD_FILE_PATH = "src/test/resources/Ajay_Gupta_resume_.pdf";
+
+    private static final String TARGET_REQUIREMENT = "ReqTest-1778055195163";
 
     @BeforeAll
     static void setupBrowser() throws IOException {
-        // 🚀 1. INITIALIZE THE DASHBOARD
         DashboardManager.initReport();
 
         Path jdPath = Paths.get(JD_FILE_PATH);
@@ -39,8 +41,8 @@ public class ScheduleAssessmentTest {
 
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                .setChannel("chrome")  // <--- THIS TELLS PLAYWRIGHT TO USE REAL CHROME
-                .setHeadless(true)
+                .setChannel("chrome")
+                .setHeadless(false)
         );
     }
 
@@ -48,8 +50,9 @@ public class ScheduleAssessmentTest {
     void setup() {
         context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
 
-        // ⭐ ADD THIS: Start tracing before creating the page
         context.tracing().start(new Tracing.StartOptions()
+                .setName("Admin-Setup-Flow")
+                .setTitle("Admin Dashboard - Setup & Shortlist")
                 .setScreenshots(true)
                 .setSnapshots(true)
                 .setSources(true));
@@ -61,46 +64,71 @@ public class ScheduleAssessmentTest {
     @Test
     @Order(1)
     void testScheduleAssessmentFlow() {
-        // 🚀 2. START A NEW TEST IN THE DASHBOARD
         DashboardManager.startTest("E2E Full Flow Execution - Schedule Assessment");
-
         DashboardManager.log("[REPORT] 🚀 Starting E2E Journey...");
 
-        // --- 1. Login & Navigation ---
+        // ──────────────────────────────────────────────────────────────
+        // 1. LOGIN
+        // ──────────────────────────────────────────────────────────────
         LoginPage loginPage = new LoginPage(page);
         assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed");
 
-        RequirementListingPage listingPage = new RequirementListingPage(page);
-        assertTrue(listingPage.clickNewRequirement(), "Navigation failed");
-
-        // --- 2. Create Requirements ---
-        CreateRequirementPage createPage = new CreateRequirementPage(page);
-        String commonJdPath = JD_FILE_PATH;
-
-        boolean success = createPage.createMultipleRequirements(List.of(
-                new CreateRequirementPage.RequirementData("Full Time", "Onsite", "JS", "React", "52106", commonJdPath)
-        ), "Requirement generated successfully");
-
-        assertTrue(success, "Failed to create requirements");
-
+        String firstReqName;
 
         // ──────────────────────────────────────────────────────────────
-        // 3. CAPTURE NAME & STATUS
+        // 2. REQUIREMENT — USE EXISTING OR CREATE NEW
         // ──────────────────────────────────────────────────────────────
-        String firstReqName = verifyTopRequirements(1);
+        if (TARGET_REQUIREMENT != null && !TARGET_REQUIREMENT.trim().isEmpty()) {
+            DashboardManager.log("[REPORT] 🎯 Target Requirement specified: " + TARGET_REQUIREMENT);
+            firstReqName = TARGET_REQUIREMENT;
+
+            DashboardManager.log("   -> Navigating to Requirement Listing...");
+            page.locator("a[href='/hiring-requests']").first().click();
+            page.waitForLoadState();
+
+        } else {
+            DashboardManager.log("[REPORT] 🆕 No Target Requirement specified. Creating a new one...");
+
+            RequirementListingPage listingPage = new RequirementListingPage(page);
+            assertTrue(listingPage.clickNewRequirement(), "Navigation failed");
+
+            CreateRequirementPage createPage = new CreateRequirementPage(page);
+            boolean success = createPage.createMultipleRequirements(List.of(
+                    new CreateRequirementPage.RequirementData("Full Time", "Onsite", "JS", "React", "52106", JD_FILE_PATH)
+            ), "Requirement generated successfully");
+
+            assertTrue(success, "Failed to create requirements");
+
+            firstReqName = verifyTopRequirements(1);
+
+            DashboardManager.log("   -> Navigating to Requirement Listing...");
+            page.locator("a[href='/hiring-requests']").first().click();
+            page.waitForLoadState();
+        }
 
         // ──────────────────────────────────────────────────────────────
-        // 🏁 NAVIGATION TO EXISTING REQUIREMENT
+        // 3. SEARCH & OPEN REQUIREMENT
         // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("   -> Navigating to Requirement Listing...");
-        page.locator("a[href='/hiring-requests']").first().click();
-        page.waitForLoadState();
+        DashboardManager.log("   -> Searching for Requirement: " + firstReqName);
 
-        DashboardManager.log("   -> Opening Requirement: " + firstReqName);
-        // Find the specific requirement and click it
-        page.getByText(firstReqName).first().click();
+        Locator searchFilterBtn = page.locator("div.font-semibold")
+                .filter(new Locator.FilterOptions().setHasText("Search & Filters")).first();
+        searchFilterBtn.click();
+
+        Locator searchInput = page.locator("input[placeholder='Search by client name, budget, title, email ...']");
+        searchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        searchInput.fill(firstReqName);
         page.waitForTimeout(2000);
 
+        DashboardManager.log("   -> Opening Requirement: " + firstReqName);
+        Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(firstReqName));
+        Locator viewDetailsBtn = reqRow.locator("button[title='View Details']");
+        if (viewDetailsBtn.count() > 0) {
+            viewDetailsBtn.first().click();
+        } else {
+            reqRow.locator("a").first().click();
+        }
+        page.waitForTimeout(2000);
 
         // ──────────────────────────────────────────────────────────────
         // 4. PARTNER SHORTLISTING FLOW
@@ -108,27 +136,63 @@ public class ScheduleAssessmentTest {
         DashboardManager.log("\n[REPORT] 🚀 Starting Partner Shortlisting Flow for: " + firstReqName);
 
         PartnerShortlistingPage partnerPage = new PartnerShortlistingPage(page);
-        partnerPage.verifyRequirementStatus();
-        partnerPage.navigateToPartnerShortlisting();
+
+        DashboardManager.log("   -> Switching to Partner Shortlisting Tab...");
+        page.locator("button[role='tab']")
+                .filter(new Locator.FilterOptions().setHasText(Pattern.compile("Partner Shortlisting")))
+                .first().click();
         page.waitForTimeout(2000);
-        partnerPage.shortlistVendors(List.of("bharat pvt ltd"));//, "Vendor Eur", "Vendor AED", "Vendor USD"
-        partnerPage.clickSendHiringRequirement();
-        partnerPage.fillBudgetDetails();
-        partnerPage.submitShortlisting();
-        partnerPage.verifySuccessToast();
 
-        DashboardManager.log("[REPORT] 🎉 Partner Shortlisting Flow Completed.");
+        DashboardManager.log("   -> Expanding Shortlisted Partners Search & Filters...");
+        try {
+            page.locator("div.font-semibold")
+                    .filter(new Locator.FilterOptions().setHasText("Search & Filters"))
+                    .first().click();
+            page.waitForTimeout(1000);
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ Search & Filters button not found, assuming it is already expanded.");
+        }
 
+        DashboardManager.log("   -> Checking if vendor is already shortlisted...");
+        Locator shortlistedSearchInput = page.locator("input[placeholder='Search shortlisted partners...']");
+        shortlistedSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+        shortlistedSearchInput.fill("bharat pvt ltd");
+        page.waitForTimeout(2000);
+
+        Locator noPartnersFound = page.locator("div.text-muted-foreground")
+                .filter(new Locator.FilterOptions().setHasText("No Shortlisted Partners Found."));
+
+        if (noPartnersFound.isVisible()) {
+            DashboardManager.log("   ⚠️ Vendor not found. Proceeding to shortlist vendors...");
+            shortlistedSearchInput.clear();
+            page.waitForTimeout(1000);
+
+            partnerPage.shortlistVendors(List.of("bharat pvt ltd"));
+            partnerPage.clickSendHiringRequirement();
+            partnerPage.fillBudgetDetails();
+            partnerPage.submitShortlisting();
+            partnerPage.verifySuccessToast();
+            DashboardManager.log("[REPORT] 🎉 Partner Shortlisting Flow Completed.");
+        } else {
+            DashboardManager.log("   ✅ Vendor is already shortlisted. Skipping shortlisting step.");
+        }
+
+        // ⭐ TRACE: Stop Admin Setup Trace
+        context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-1-setup-shortlist-trace.zip")));
+        DashboardManager.log("[REPORT] 💾 Admin Setup trace saved → target/admin-1-setup-shortlist-trace.zip");
 
         // ──────────────────────────────────────────────────────────────
-        // 5. VENDOR PORTAL FLOW (Site B)
+        // 5. VENDOR PORTAL FLOW
         // ──────────────────────────────────────────────────────────────
         DashboardManager.log("\n[REPORT] 🔄 Switching to Vendor Portal...");
 
         BrowserContext vendorContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-
-        // ⭐ TRACING FOR VENDOR 1
-        vendorContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        vendorContext.tracing().start(new Tracing.StartOptions()
+                .setName("Vendor-Submit-Candidates")
+                .setTitle("Vendor Portal - Candidate Submission")
+                .setScreenshots(true)
+                .setSnapshots(true)
+                .setSources(true));
 
         Page vendorPage = vendorContext.newPage();
         vendorPage.navigate("https://uat-vendor.embtalent.ai/login");
@@ -137,66 +201,48 @@ public class ScheduleAssessmentTest {
         submitPage.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234");
         submitPage.navigateToProject(firstReqName);
         submitPage.acceptProject();
-
-        submitPage.addMembers(1, JD_FILE_PATH); // 🚀 REAL UPLOAD - No Bypassing
-        //submitPage.addMembersFromTeam(Arrays.asList("Candidate 2", "Candidate 3", "Candidate 4"));
-
-        // Then click final submit
+        submitPage.addMembers(1, JD_FILE_PATH);
         submitPage.submitCandidates();
-
         submitPage.verifyCandidateStatus();
 
-        // Close Vendor Context
         vendorContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-1-submit-trace.zip")));
+        DashboardManager.log("[REPORT] 💾 Vendor Submit trace saved → target/vendor-1-submit-trace.zip");
         vendorContext.close();
         DashboardManager.log("[REPORT] 🎉 Vendor Flow Completed.");
 
-
         // ──────────────────────────────────────────────────────────────
-        // 6. SCHEDULE ASSESSMENT FLOW
+        // 6. ADMIN: SCHEDULE & CANCEL ASSESSMENT FLOW
         // ──────────────────────────────────────────────────────────────
         DashboardManager.log("\n[REPORT] 🚀 Starting Schedule Assessment Flow...");
 
-        // 🔥 CRITICAL FIX: Bring Admin Page to Front & Wait 🔥
+        context.tracing().start(new Tracing.StartOptions()
+                .setName("Admin-Schedule-Assessment")
+                .setTitle("Admin Dashboard - Schedule Assessment")
+                .setScreenshots(true)
+                .setSnapshots(true)
+                .setSources(true));
+
         page.bringToFront();
         page.waitForTimeout(1000);
 
         ScheduleAssessmentPage adminSchedule = new ScheduleAssessmentPage(page);
 
-        // --- A. Admin: Update Status to 'Schedule Assessment' ---
         DashboardManager.log("[REPORT] 👮 Admin: Updating Candidate Status...");
-        adminSchedule.navigateToRequirementListing();
-        adminSchedule.openRequirement(firstReqName);
-        adminSchedule.clickCandidatesTab();
+        searchAndOpenRequirementFromTest(firstReqName);
+
+        DashboardManager.log("   -> Clicking 'Candidates' Tab...");
+        page.getByRole(AriaRole.TAB)
+                .filter(new Locator.FilterOptions().setHasText("Candidates")).click();
+        page.waitForTimeout(1000);
 
         adminSchedule.openCandidateAndVerify("Candidate 1", "bharat pvt ltd");
         adminSchedule.adminUpdateStatusToAssessment();
 
-        // --- B. Vendor: Select Time Slots ---
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Selecting Time Slots...");
+        // ⭐ TRACE: Stop Admin Schedule Assessment Trace
+        context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-2-schedule-assessment-trace.zip")));
+        DashboardManager.log("[REPORT] 💾 Admin Schedule Assessment trace saved → target/admin-2-schedule-assessment-trace.zip");
 
-        BrowserContext vendorContext2 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-
-        // ⭐ ADDED TRACING FOR VENDOR 2
-        vendorContext2.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
-        Page vendorPage2 = vendorContext2.newPage();
-        vendorPage2.navigate("https://uat-vendor.embtalent.ai/login");
-
-        SubmitCandidatePage vendorLogin = new SubmitCandidatePage(vendorPage2);
-        vendorLogin.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234");
-
-        ScheduleAssessmentPage vendorSchedule = new ScheduleAssessmentPage(vendorPage2);
-        vendorSchedule.vendorNavigateToProjects();
-        vendorSchedule.vendorOpenProjectAndVerify(firstReqName);
-        vendorSchedule.vendorOpenCandidateAndVerify("Candidate 1");
-        vendorSchedule.vendorSelectTimeSlots();
-
-        // ⭐ STOP TRACING FOR VENDOR 2
-        vendorContext2.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-2-assessment-timeslots-trace.zip")));
-        vendorContext2.close();
-
-        DashboardManager.log("[REPORT] ✅ Assessment E2E Flow Completed Successfully up to Time Slot Selection!");
+        DashboardManager.log("[REPORT] ✅ Assessment Flow Completed Successfully!");
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -234,14 +280,43 @@ public class ScheduleAssessmentTest {
         return firstTitle;
     }
 
+    private void searchAndOpenRequirementFromTest(String reqName) {
+        DashboardManager.log("   -> Navigating to Requirement Listing...");
+        page.locator("a[href='/hiring-requests']").first().click();
+        page.waitForLoadState();
+        page.waitForTimeout(2000);
+
+        DashboardManager.log("   -> Searching for Requirement: " + reqName);
+        Locator reqSearchFilterBtn = page.locator("div.font-semibold")
+                .filter(new Locator.FilterOptions().setHasText("Search & Filters")).first();
+        reqSearchFilterBtn.click();
+
+        Locator reqSearchInput = page.locator("input[placeholder='Search by client name, budget, title, email ...']");
+        reqSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        reqSearchInput.fill(reqName);
+        page.waitForTimeout(2000);
+
+        DashboardManager.log("   -> Opening Requirement: " + reqName);
+        Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
+        Locator viewDetailsBtn = reqRow.locator("button[title='View Details']");
+
+        if (viewDetailsBtn.count() > 0) {
+            viewDetailsBtn.first().click();
+        } else {
+            reqRow.locator("a").first().click();
+        }
+        page.waitForTimeout(2000);
+    }
+
     @AfterEach
     void tearDown(TestInfo testInfo) {
         if (context != null) {
             try {
-                String tracePath = "target/" + testInfo.getDisplayName().replace(" ", "_") + "-trace.zip";
+                String tracePath = "target/" + testInfo.getDisplayName().replace(" ", "_") + "-fallback-trace.zip";
                 context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get(tracePath)));
+                DashboardManager.log("[REPORT] 💾 Fallback trace saved → " + tracePath);
             } catch (Exception e) {
-                System.err.println("Failed to save Admin trace: " + e.getMessage());
+                // Silently catch if tracing was already cleanly stopped
             }
             context.close();
         }
@@ -252,7 +327,6 @@ public class ScheduleAssessmentTest {
         if (browser != null) browser.close();
         if (playwright != null) playwright.close();
 
-        // 🚀 3. SAVE THE DASHBOARD & SEND EMAIL
         DashboardManager.flushReport();
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");

@@ -70,7 +70,7 @@ public class VendorAuthPage {
     }
 
     public void navigate() {
-        page.navigate("https://uat-vendor.embtalent.ai/login");
+        page.navigate("https://dev-vendor.embtalent.ai/login");
     }
 
 

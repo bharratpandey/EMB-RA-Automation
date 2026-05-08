@@ -24,11 +24,10 @@ public class CreateRequirementTest {
     private BrowserContext context;
     private Page page;
 
-    private static final String JD_FILE_PATH = "target/Ajay_Gupta_resume_.pdf";
+    private static final String JD_FILE_PATH = "src/test/resources/Ajay_Gupta_resume_.pdf";
 
     @BeforeAll
     static void setupBrowser() throws IOException {
-        // 🚀 1. INITIALIZE THE DASHBOARD
         DashboardManager.initReport();
 
         Path jdPath = Paths.get(JD_FILE_PATH);
@@ -36,11 +35,8 @@ public class CreateRequirementTest {
         if (!Files.exists(jdPath)) Files.write(jdPath, "Dummy PDF content".getBytes());
 
         playwright = Playwright.create();
-        //browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-        //        .setHeadless(true)
-        //);
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                .setChannel("chrome")  // <--- THIS TELLS PLAYWRIGHT TO USE REAL CHROME
+                .setChannel("chrome")
                 .setHeadless(false)
         );
     }
@@ -48,79 +44,64 @@ public class CreateRequirementTest {
     @BeforeEach
     void setup() {
         context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-
-        // ⭐ ADD THIS: Start tracing before creating the page
         context.tracing().start(new Tracing.StartOptions()
                 .setScreenshots(true)
                 .setSnapshots(true)
                 .setSources(true));
-
         page = context.newPage();
         page.navigate("https://uat-admin.embtalent.ai/login");
     }
 
     @Test
     void createFourRequirementsAtOnce() {
-        // 🚀 2. START A NEW TEST IN THE DASHBOARD
         DashboardManager.startTest("E2E Full Flow Execution");
-
         DashboardManager.log("[REPORT] 🚀 Starting E2E Journey...");
 
-        // --- 1. Login & Navigation ---
+        // ── STEP 1: Login ──────────────────────────────────────────────
+        DashboardManager.log("\n[STEP 1] 🔑 Admin Login");
         LoginPage loginPage = new LoginPage(page);
-        assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed"); //deev=saumyaadminqa@yopmail.com,admin@122 ,uaat=bharat.pandey@emb.global
-
-
+        assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed");
 
         RequirementListingPage listingPage = new RequirementListingPage(page);
         assertTrue(listingPage.clickNewRequirement(), "Navigation failed");
 
-        // --- 2. Create 4 Requirements ---
+        // ── STEP 2: Create Requirement ────────────────────────────────
+        DashboardManager.log("\n[STEP 2] 📋 Creating Requirement");
         CreateRequirementPage createPage = new CreateRequirementPage(page);
         String commonJdPath = JD_FILE_PATH;
 
-        // Change the first parameter from 'false' to the desired Engagement Type String
-        // Example: "Full Time", "Contractual", or "Contract To Hire"
         boolean success = createPage.createMultipleRequirements(List.of(
                 new CreateRequirementPage.RequirementData("Full Time", "Onsite", "JS", "React", "52106", commonJdPath)
-                //,new CreateRequirementPage.RequirementData("Contractual", "Hybrid", "Java", "Spring", "52107", commonJdPath),
-                //new CreateRequirementPage.RequirementData("Contract To Hire", "Remote", "Python", "Django", "52108", commonJdPath),
-                //new CreateRequirementPage.RequirementData("Full Time", "Onsite", "Node", "Express", "52109", commonJdPath)
         ), "Requirement generated successfully");
 
         assertTrue(success, "Failed to create requirements");
 
-
-        // ──────────────────────────────────────────────────────────────
-        // 3. CAPTURE NAME & STATUS
-        // ──────────────────────────────────────────────────────────────
+        // ── STEP 3: Capture Requirement Name ──────────────────────────
+        DashboardManager.log("\n[STEP 3] 🔍 Capturing Requirement Name & Status");
         String firstReqName = verifyTopRequirements(1);
+        DashboardManager.log("[STEP 3] ✅ Requirement to use: " + firstReqName);
 
-        /*
-        String firstReqName = "AUT93 - AI Engineer 3 yoe 66";
-        DashboardManager.log("[INFO] The ID we will use for Vendor Portal is: " + firstReqName);
-
-
-         */
-        // ──────────────────────────────────────────────────────────────
-        // 🏁 NAVIGATION TO EXISTING REQUIREMENT
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("   -> Navigating to Requirement Listing...");
+        // ── STEP 3b: Navigate to Requirement ──────────────────────────
+        DashboardManager.log("\n[STEP 3b] 🔎 Navigating to Requirement: " + firstReqName);
         page.locator("a[href='/hiring-requests']").first().click();
         page.waitForLoadState();
 
-        DashboardManager.log("   -> Opening Requirement: " + firstReqName);
-        // Find the specific requirement and click it
-        page.getByText(firstReqName).first().click();
+        page.locator("div.bg-gray-100").filter(new Locator.FilterOptions().setHasText("Search & Filters"))
+                .first().click();
+        page.waitForTimeout(1000);
+
+        page.locator("input[placeholder='Search by client name, budget, title, email ...']")
+                .fill(firstReqName);
+        page.waitForTimeout(2500);
+
+        DashboardManager.log("[STEP 3b] -> Opening Requirement via eye icon...");
+        page.locator("button[title='View Details']").first().click();
+        page.waitForLoadState();
         page.waitForTimeout(2000);
 
-        // ──────────────────────────────────────────────────────────────
-        // 4. PARTNER SHORTLISTING FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Partner Shortlisting Flow for: " + firstReqName);
-
+        // ── STEP 4: Partner Shortlisting ──────────────────────────────
+        DashboardManager.log("\n[STEP 4] 🤝 Partner Shortlisting for: " + firstReqName);
         PartnerShortlistingPage partnerPage = new PartnerShortlistingPage(page);
-        // partnerPage.openFirstRequirement();
         partnerPage.verifyRequirementStatus();
         partnerPage.navigateToPartnerShortlisting();
         page.waitForTimeout(2000);
@@ -129,364 +110,478 @@ public class CreateRequirementTest {
         partnerPage.fillBudgetDetails();
         partnerPage.submitShortlisting();
         partnerPage.verifySuccessToast();
+        DashboardManager.log("[STEP 4] ✅ Partner Shortlisting Completed.");
 
-        DashboardManager.log("[REPORT] 🎉 Partner Shortlisting Flow Completed.");
+        // Save admin trace checkpoint after shortlisting
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-01-shortlisting-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-01-shortlisting-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin shortlisting trace: " + e.getMessage());
+        }
 
-        // ──────────────────────────────────────────────────────────────
-        // 5. VENDOR PORTAL FLOW (Site B)
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🔄 Switching to Vendor Portal...");
-
+        // ── STEP 5: Vendor Submit Candidate ───────────────────────────
+        DashboardManager.log("\n[STEP 5] 🏢 Vendor Portal — Submitting Candidate");
         BrowserContext vendorContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-
-        // ⭐ TRACING FOR VENDOR 1
         vendorContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage = vendorContext.newPage();
         vendorPage.navigate("https://uat-vendor.embtalent.ai/login");
 
         SubmitCandidatePage submitPage = new SubmitCandidatePage(vendorPage);
-        submitPage.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234"); //deev=bharat.pandey@emb.global ,uat=bharat.pandey+1@emb.global
+        submitPage.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234");
         submitPage.navigateToProject(firstReqName);
         submitPage.acceptProject();
 
-        submitPage.addMembers(1, JD_FILE_PATH); // Adding 1 member as per your request
+        // ── Inline: Add New Member ─────────────────────────────────────
+        DashboardManager.log("\n[STEP 5a] 👤 Adding 1 Member Inline...");
+        try {
+            Locator addBtn = vendorPage.locator("button")
+                    .filter(new Locator.FilterOptions().setHasText("Add New Member")).first();
+            addBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+            addBtn.click();
+            vendorPage.waitForTimeout(1000);
+
+            DashboardManager.log("   [5a-1] 📤 Uploading Resume...");
+            vendorPage.locator("input[type='file'][accept='.pdf']").first()
+                    .setInputFiles(Paths.get(JD_FILE_PATH));
+            DashboardManager.log("   [5a-1] ✅ Resume file attached.");
+            vendorPage.waitForTimeout(2000);
+
+            DashboardManager.log("   [5a-2] -> Clicking 'Import from resume'...");
+            vendorPage.locator("button")
+                    .filter(new Locator.FilterOptions().setHasText("Import from resume"))
+                    .first()
+                    .click(new Locator.ClickOptions().setForce(true));
+            DashboardManager.log("   [5a-2] -> Clicked. Waiting for extraction toast (max 59s)...");
+
+            boolean toastFound = false;
+            try {
+                vendorPage.locator("span")
+                        .filter(new Locator.FilterOptions().setHasText("Resume details extracted!"))
+                        .first()
+                        .waitFor(new Locator.WaitForOptions()
+                                .setState(WaitForSelectorState.VISIBLE).setTimeout(59000));
+                DashboardManager.log("   [5a-2] ✅ Toast: 'Resume details extracted!' — Extraction working fine");
+                toastFound = true;
+            } catch (Exception e) {
+                DashboardManager.log("   [5a-2] ⚠️ Toast not found in 59s — waiting additional 60s (120s total)...");
+            }
+
+            if (!toastFound) {
+                try {
+                    vendorPage.locator("span")
+                            .filter(new Locator.FilterOptions().setHasText("Resume details extracted!"))
+                            .first()
+                            .waitFor(new Locator.WaitForOptions()
+                                    .setState(WaitForSelectorState.VISIBLE).setTimeout(60000));
+                    DashboardManager.log("   [5a-2] ✅ Toast found after extended wait.");
+                } catch (Exception e) {
+                    DashboardManager.log("   [5a-2] ❌ SLOW EXTRACTION — Toast not visible after 120s. Stopping automation.");
+                    throw new RuntimeException("SLOW EXTRACTION: Resume details extracted toast not visible after 120 seconds.");
+                }
+            }
+            vendorPage.waitForTimeout(1500);
+
+            DashboardManager.log("   [5a-3] 📝 Filling Basic Info...");
+            vendorPage.locator("input[name='name']").clear();
+            vendorPage.locator("input[name='name']").fill("Candidate 1");
+
+            vendorPage.locator("input[name='email']").last().clear();
+            vendorPage.locator("input[name='email']").last()
+                    .fill("TestMember" + System.currentTimeMillis() + "@yopmail.com");
+
+            vendorPage.locator("input[name='linkedin']").clear();
+            vendorPage.locator("input[name='linkedin']").fill("https://in.linkedin.com/company/embglobal");
+
+            vendorPage.locator("input[name='interviewLink']").clear();
+            vendorPage.locator("input[name='interviewLink']").fill("https://www.example.com/");
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-3] ✅ Basic Info Filled.");
+
+            DashboardManager.log("   [5a-4] 🏆 Adding Award...");
+            try {
+                Locator addAwardsBtn = vendorPage.locator("button").filter(
+                        new Locator.FilterOptions().setHas(
+                                vendorPage.locator("span").filter(
+                                        new Locator.FilterOptions().setHasText("Add Awards")
+                                )
+                        )
+                ).first();
+                addAwardsBtn.scrollIntoViewIfNeeded();
+                addAwardsBtn.click(new Locator.ClickOptions().setForce(true));
+                vendorPage.waitForTimeout(500);
+
+                vendorPage.locator("input[name='nameOfAward']").clear();
+                vendorPage.locator("input[name='nameOfAward']").fill("EOY");
+
+                vendorPage.locator("button[role='combobox']")
+                        .filter(new Locator.FilterOptions().setHasText("Select year")).click();
+                vendorPage.waitForTimeout(500);
+                vendorPage.locator("div[role='option']")
+                        .filter(new Locator.FilterOptions().setHasText("2024")).click();
+                vendorPage.waitForTimeout(500);
+
+                vendorPage.locator("textarea[name='description']").first().clear();
+                vendorPage.locator("textarea[name='description']").first()
+                        .fill("this is the Automated Description box");
+
+                vendorPage.locator("button[type='submit']")
+                        .filter(new Locator.FilterOptions().setHasText("Save Award")).click();
+                vendorPage.waitForTimeout(2000);
+                DashboardManager.log("   [5a-4] ✅ Award Added.");
+            } catch (Exception e) {
+                DashboardManager.log("   [5a-4] ❌ Award Failed: " + e.getMessage());
+            }
+
+            DashboardManager.log("   [5a-5] ⚙️ Filling Engagement & Financials...");
+            vendorPage.locator("button[role='combobox']").nth(1).click();
+            vendorPage.waitForTimeout(500);
+            vendorPage.locator("div[role='option']")
+                    .filter(new Locator.FilterOptions().setHasText("Both")).click();
+            vendorPage.waitForTimeout(1000);
+
+            vendorPage.locator("input[name='currentCtc']").clear();
+            vendorPage.locator("input[name='currentCtc']").fill("1200000");
+
+            vendorPage.locator("input[name='expectedCtc']").clear();
+            vendorPage.locator("input[name='expectedCtc']").fill("2000000");
+
+            Locator agencyCost = vendorPage.locator("input[name='agencyCost']");
+            if (agencyCost.isVisible()) { agencyCost.clear(); agencyCost.fill("95000"); }
+
+            Locator hourlyCost = vendorPage.locator("input[name='hourly_cost_estimate']");
+            if (hourlyCost.isVisible()) { hourlyCost.clear(); hourlyCost.fill("594"); }
+
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-5] ✅ Engagement & Financials Filled.");
+
+            DashboardManager.log("   [5a-6] ⏳ Selecting Notice Period...");
+            vendorPage.locator("button[role='combobox']")
+                    .filter(new Locator.FilterOptions().setHasText("Select notice period")).click();
+            vendorPage.waitForTimeout(500);
+            vendorPage.locator("div[role='option']")
+                    .filter(new Locator.FilterOptions().setHasText("Available Immediately")).click();
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-6] ✅ Notice Period: Available Immediately");
+
+            DashboardManager.log("   [5a-7] 📍 Selecting Current Location...");
+            vendorPage.locator("button[role='combobox']")
+                    .filter(new Locator.FilterOptions().setHasText("Select location")).click();
+            vendorPage.waitForTimeout(500);
+            vendorPage.locator("input[placeholder='Search...']").fill("New Delhi");
+            vendorPage.waitForTimeout(1000);
+            vendorPage.locator("div[role='option']")
+                    .filter(new Locator.FilterOptions().setHasText("New Delhi, Delhi, India")).click();
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-7] ✅ Location: New Delhi, Delhi, India");
+
+            DashboardManager.log("   [5a-8] 🌍 Adding Serviceable Locations...");
+            vendorPage.locator("button").filter(new Locator.FilterOptions()
+                    .setHasText(Pattern.compile("^All$"))).first().click();
+            vendorPage.waitForTimeout(1000);
+            vendorPage.locator("button").filter(new Locator.FilterOptions()
+                            .setHasText("Add Locations")).first()
+                    .click(new Locator.ClickOptions().setForce(true));
+            vendorPage.waitForTimeout(1000);
+
+            Locator locSearch = vendorPage.locator("input[placeholder='Try entering a city or state']");
+            locSearch.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            locSearch.fill("New Delhi");
+            vendorPage.waitForTimeout(1500);
+            vendorPage.locator("div.flex.items-center.justify-between")
+                    .filter(new Locator.FilterOptions().setHasText("New Delhi, Delhi, India"))
+                    .locator("button[role='checkbox']").click();
+            vendorPage.waitForTimeout(500);
+
+            locSearch.clear();
+            locSearch.fill("United States");
+            vendorPage.waitForTimeout(1500);
+            vendorPage.locator("div.flex.items-center.justify-between")
+                    .filter(new Locator.FilterOptions().setHasText("United States"))
+                    .locator("button[role='checkbox']").first().click();
+            vendorPage.waitForTimeout(500);
+
+            vendorPage.locator("button").filter(new Locator.FilterOptions()
+                    .setHasText("Save Selection")).click();
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-8] ✅ Serviceable Locations Saved (New Delhi + United States).");
+
+            DashboardManager.log("   [5a-9] 🌐 Selecting Timezone...");
+            vendorPage.locator("div[role='combobox']")
+                    .filter(new Locator.FilterOptions().setHasText("Select Timezones")).click();
+            vendorPage.waitForTimeout(500);
+            vendorPage.locator("input[placeholder='Search...']").fill("India");
+            vendorPage.waitForTimeout(1000);
+            vendorPage.locator("div.relative.flex.cursor-pointer")
+                    .filter(new Locator.FilterOptions().setHasText("India")).first().click();
+            vendorPage.waitForTimeout(1000);
+            DashboardManager.log("   [5a-9] ✅ Timezone: India");
+
+            DashboardManager.log("   [5a-10] 💾 Saving Member...");
+            vendorPage.locator("button")
+                    .filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Available$"))).first()
+                    .click();
+            vendorPage.waitForTimeout(500);
+
+            long saveStart = System.currentTimeMillis();
+            vendorPage.locator("button")
+                    .filter(new Locator.FilterOptions().setHasText("Save Member Details")).click();
+
+            vendorPage.locator("span")
+                    .filter(new Locator.FilterOptions().setHasText("Team member added successfully!"))
+                    .first()
+                    .waitFor(new Locator.WaitForOptions()
+                            .setState(WaitForSelectorState.VISIBLE).setTimeout(20000));
+
+            long saveDuration = System.currentTimeMillis() - saveStart;
+            DashboardManager.log("   [5a-10] ✅ Member Saved.");
+            DashboardManager.log("   [5a-10] " + (saveDuration <= 500
+                    ? "✅ Save API Fast → " + saveDuration + "ms"
+                    : "⚠️ Save API Slow → " + saveDuration + "ms (exceeds 500ms)"));
+            vendorPage.waitForTimeout(3000);
+
+        } catch (RuntimeException re) {
+            // Save vendor trace before re-throwing so crash is captured
+            try {
+                vendorContext.tracing().stop(new Tracing.StopOptions()
+                        .setPath(Paths.get("target/vendor-1-crash-trace.zip")));
+                DashboardManager.log("   💾 Vendor crash trace saved → target/vendor-1-crash-trace.zip");
+            } catch (Exception ignored) {}
+            throw re;
+        } catch (Exception e) {
+            DashboardManager.log("❌ [STEP 5a] Inline Add Member Failed: " + e.getMessage());
+        }
+
+        DashboardManager.log("\n[STEP 5b] 👥 Adding Team Members (Candidate 2, 3, 4)...");
         submitPage.addMembersFromTeam(Arrays.asList("Candidate 2", "Candidate 3", "Candidate 4"));
 
-        // Then click final submit
+        DashboardManager.log("\n[STEP 5c] 🚀 Submitting Candidates for Interview...");
         submitPage.submitCandidates();
 
+        DashboardManager.log("\n[STEP 5d] 🔍 Verifying Candidate Status...");
         submitPage.verifyCandidateStatus();
 
-        // Close Vendor Context
         vendorContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-1-submit-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-1-submit-trace.zip");
         vendorContext.close();
-        DashboardManager.log("[REPORT] 🎉 Vendor Flow Completed.");
+        DashboardManager.log("[STEP 5] ✅ Vendor Flow Completed.");
 
-         /* =========================================================================
-           TEMPORARILY SKIPPED: ASSESSMENT FLOW (Steps 6, 7, and 8)
-           (Delete the /* here and the * / below to reactivate this section)
-           ========================================================================= */
-        /*
-        // ──────────────────────────────────────────────────────────────
-        // 6. SCHEDULE ASSESSMENT FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Schedule Assessment Flow...");
-
-        // 🔥 CRITICAL FIX: Bring Admin Page to Front & Wait 🔥
+        // ── STEP 9: Schedule Assignment ───────────────────────────────
+        DashboardManager.log("\n[STEP 9] 📋 Schedule Assignment Flow");
         page.bringToFront();
         page.waitForTimeout(1000);
 
-        ScheduleAssessmentPage adminSchedule = new ScheduleAssessmentPage(page);
-
-        // --- A. Admin: Update Status to 'Schedule Assessment' ---
-        DashboardManager.log("[REPORT] 👮 Admin: Updating Candidate Status...");
-        adminSchedule.navigateToRequirementListing();
-        adminSchedule.openRequirement(firstReqName);
-        adminSchedule.clickCandidatesTab();
-
-        adminSchedule.openCandidateAndVerify("Candidate 1", "bharat pvt ltd");
-        adminSchedule.adminUpdateStatusToAssessment();
-
-        // --- B. Vendor: Select Time Slots ---
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Selecting Time Slots...");
-
-        BrowserContext vendorContext2 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        Page vendorPage2 = vendorContext2.newPage();
-        vendorPage2.navigate("https://uat-vendor.embtalent.ai/login");
-
-        SubmitCandidatePage vendorLogin = new SubmitCandidatePage(vendorPage2);
-        vendorLogin.loginToVendorPortal("bharat.pandey+1@emb.global", "Emb@1234");
-
-        ScheduleAssessmentPage vendorSchedule = new ScheduleAssessmentPage(vendorPage2);
-        vendorSchedule.vendorNavigateToProjects();
-        vendorSchedule.vendorOpenProjectAndVerify(firstReqName);
-        vendorSchedule.vendorOpenCandidateAndVerify("Candidate 1");
-        vendorSchedule.vendorSelectTimeSlots();
-
-        vendorContext2.close();
-
-        // --- C. Admin: Finalize Schedule ---
-        DashboardManager.log("\n[REPORT] 👮 Admin: Finalizing Schedule...");
-
-        // 🔥 Switch back to Admin again
-        page.bringToFront();
-        page.waitForTimeout(1000);
-
-        adminSchedule.navigateToRequirementListing();
-        adminSchedule.openRequirement(firstReqName);
-        adminSchedule.clickCandidatesTab();
-        adminSchedule.openCandidateAndVerify("Candidate 1", "bharat pvt ltd");
-
-        adminSchedule.adminScheduleAssessmentAction();
-        adminSchedule.captureAssessmentDetails();
-
-        DashboardManager.log("[REPORT] 🎉 Assessment Scheduled Successfully.");
-
-        // ──────────────────────────────────────────────────────────────
-        // 7. UPLOAD ASSESSMENT RESULT
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 📝 Admin: Uploading Assessment Result...");
-
-        adminSchedule.adminUploadAssessmentResult(JD_FILE_PATH);
-
-        // ──────────────────────────────────────────────────────────────
-        // 8. VERIFY STATUS ON VENDOR PORTAL
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Final Status...");
-
-        BrowserContext vendorContext3 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        Page vendorPage3 = vendorContext3.newPage();
-
-        ScheduleAssessmentPage vendorVerify = new ScheduleAssessmentPage(vendorPage3);
-
-        vendorVerify.verifyVendorAssessmentStatus(
-                "https://deev-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",
-                "Emb@1234",
-                firstReqName
-        );
-
-        vendorContext3.close();
-        DashboardManager.log("[REPORT] ✅ Assessment E2E Flow Completed Successfully!");
-        */
-
-
-        // ──────────────────────────────────────────────────────────────
-        // 9. SCHEDULE ASSIGNMENT FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Schedule Assignment Flow...");
-
-        // Bring Admin Page to Front
-        page.bringToFront();
-        page.waitForTimeout(1000);
-
-        // Initialize the Assignment Page Object
         ScheduleAssignmentPage assignmentPage = new ScheduleAssignmentPage(page);
-
-        // A. Navigate & Verify Requirement Status (Active)
         assignmentPage.navigateAndOpenRequirement(firstReqName);
-
-        // B. Open Candidate & Verify Status
-        // (Note: It will print a mismatch here since we skipped Assessment, but won't crash)
         assignmentPage.openCandidateForAssignment("Candidate 1");
-
-        // C. Update Status to 'Schedule Assignment'
         assignmentPage.updateStatusToScheduleAssignment();
-
-        // D. Fill Form & Submit Assignment
         assignmentPage.scheduleAssignmentAction(JD_FILE_PATH);
-
-        // E. Verify "Uploaded Assignment" Details
         assignmentPage.verifyAssignmentDetails();
+        DashboardManager.log("[STEP 9] ✅ Assignment Scheduled.");
 
-        DashboardManager.log("[REPORT] 🎉 Assignment Scheduled Successfully!");
+        // Save admin trace after assignment
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-02-assignment-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-02-assignment-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin assignment trace: " + e.getMessage());
+        }
 
-        // ──────────────────────────────────────────────────────────────
-        // 10. VENDOR SUBMITS ASSIGNMENT SOLUTION
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Submitting Assignment Solution...");
-
+        // ── STEP 10: Vendor Submits Assignment Solution ────────────────
+        DashboardManager.log("\n[STEP 10] 🏢 Vendor: Submitting Assignment Solution");
         BrowserContext vendorContext4 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        // ⭐ TRACING FOR VENDOR 4
         vendorContext4.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage4 = vendorContext4.newPage();
 
         ScheduleAssignmentPage vendorAssignmentPage = new ScheduleAssignmentPage(vendorPage4);
         vendorAssignmentPage.vendorSubmitAssignmentSolution(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName,
                 JD_FILE_PATH
         );
 
         vendorContext4.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-4-assignment-solution-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-4-assignment-solution-trace.zip");
         vendorContext4.close();
-        DashboardManager.log("[REPORT] 🎉 Vendor Assignment Solution Submitted.");
+        DashboardManager.log("[STEP 10] ✅ Vendor Assignment Solution Submitted.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 11. ADMIN REVIEWS ASSIGNMENT & SUBMITS FEEDBACK
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 👮 Admin: Reviewing Assignment & Submitting Feedback...");
-
-        // Bring Admin Page to Front
+        // ── STEP 11: Admin Assignment Feedback ────────────────────────
+        DashboardManager.log("\n[STEP 11] 👮 Admin: Reviewing Assignment & Submitting Feedback");
         page.bringToFront();
         page.waitForTimeout(1000);
-
         assignmentPage.adminSubmitAssignmentFeedback(firstReqName, "Candidate 1");
+        DashboardManager.log("[STEP 11] ✅ Admin Feedback Completed.");
 
-        DashboardManager.log("[REPORT] 🎉 Admin Feedback Flow Completed!");
+        // Save admin trace after assignment feedback
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-03-assignment-feedback-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-03-assignment-feedback-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin assignment feedback trace: " + e.getMessage());
+        }
 
-        // ──────────────────────────────────────────────────────────────
-        // 12. VENDOR VERIFIES FINAL ASSIGNMENT STATUS
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Final Assignment Status...");
-
+        // ── STEP 12: Vendor Verify Assignment Status ───────────────────
+        DashboardManager.log("\n[STEP 12] 🏢 Vendor: Verifying Final Assignment Status");
         BrowserContext vendorContext5 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        // ⭐ TRACING FOR VENDOR 5
         vendorContext5.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage5 = vendorContext5.newPage();
 
         ScheduleAssignmentPage finalVendorPage = new ScheduleAssignmentPage(vendorPage5);
         finalVendorPage.vendorVerifyFinalAssignmentStatus(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
 
         vendorContext5.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-5-assignment-verify-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-5-assignment-verify-trace.zip");
         vendorContext5.close();
-        DashboardManager.log("[REPORT] 🎉 Vendor Final Verification Completed.");
+        DashboardManager.log("[STEP 12] ✅ Vendor Assignment Verification Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 13. SCHEDULE INTERVIEW FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Schedule Interview Flow...");
-
-        // Bring Admin Page to Front
+        // ── STEP 13: Schedule Interview ───────────────────────────────
+        DashboardManager.log("\n[STEP 13] 📅 Schedule Interview Flow");
         page.bringToFront();
         page.waitForTimeout(1000);
 
-        // Initialize the Interview Page Object
         ScheduleInterviewPage interviewPage = new ScheduleInterviewPage(page);
-
-        // A. Navigate & Verify Requirement Status (Active)
         interviewPage.navigateAndOpenRequirement(firstReqName);
-
-        // B. Open Candidate & Verify Status (Assignment Completed)
         interviewPage.openCandidateForInterview("Candidate 1");
-
-        // C. Update Status to 'Schedule Interview'
         interviewPage.updateStatusToScheduleInterview();
-
-        // D. Select Time Slots & Submit
         interviewPage.selectInterviewTimeSlots();
-
-        // E. Verify Interview Details
         interviewPage.verifyInterviewDetails();
+        DashboardManager.log("[STEP 13] ✅ Interview Time Slots Requested.");
 
-        DashboardManager.log("[REPORT] 🎉 Interview Time Slots Requested Successfully!");
+        // Save admin trace after interview request
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-04-interview-request-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-04-interview-request-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin interview request trace: " + e.getMessage());
+        }
 
-        // ──────────────────────────────────────────────────────────────
-        // 14. VENDOR SELECTS INTERVIEW TIME
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Selecting Interview Time Slots...");
-
+        // ── STEP 14: Vendor Selects Interview Time ────────────────────
+        DashboardManager.log("\n[STEP 14] 🏢 Vendor: Selecting Interview Time Slots");
         BrowserContext vendorContext6 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        // ⭐ TRACING FOR VENDOR 6
         vendorContext6.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage6 = vendorContext6.newPage();
 
         UploadInterviewPage uploadInterviewPage = new UploadInterviewPage(vendorPage6);
         uploadInterviewPage.vendorSelectInterviewTime(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global", //deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
 
         vendorContext6.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-6-interview-slots-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-6-interview-slots-trace.zip");
         vendorContext6.close();
-        DashboardManager.log("[REPORT] 🎉 Vendor Time Slots Selected.");
+        DashboardManager.log("[STEP 14] ✅ Vendor Interview Time Slots Selected.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 15. ADMIN SCHEDULES INTERVIEW & SUBMITS FEEDBACK
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 👮 Admin: Scheduling Interview and Submitting Feedback...");
-
-        // Bring Admin Page to Front
+        // ── STEP 15: Admin Interview Feedback ─────────────────────────
+        DashboardManager.log("\n[STEP 15] 👮 Admin: Scheduling Interview & Submitting Feedback");
         page.bringToFront();
         page.waitForTimeout(1000);
 
         UploadInterviewPage adminUploadInterview = new UploadInterviewPage(page);
         adminUploadInterview.adminScheduleAndFeedbackInterview(firstReqName, "Candidate 1");
+        DashboardManager.log("[STEP 15] ✅ Admin Interview Scheduled & Feedback Submitted.");
 
-        DashboardManager.log("[REPORT] 🎉 Admin Interview Scheduled & Feedback Submitted.");
+        // Save admin trace after interview feedback
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-05-interview-feedback-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-05-interview-feedback-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin interview feedback trace: " + e.getMessage());
+        }
 
-        // ──────────────────────────────────────────────────────────────
-        // 16. VENDOR VERIFIES FINAL INTERVIEW STATUS
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Final Interview Status...");
-
+        // ── STEP 16: Vendor Verify Interview Status ───────────────────
+        DashboardManager.log("\n[STEP 16] 🏢 Vendor: Verifying Final Interview Status");
         BrowserContext vendorContext7 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        // ⭐ TRACING FOR VENDOR 7
         vendorContext7.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage7 = vendorContext7.newPage();
 
         UploadInterviewPage finalVerifyInterviewPage = new UploadInterviewPage(vendorPage7);
         finalVerifyInterviewPage.vendorVerifyFinalInterviewStatus(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",//deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
 
         vendorContext7.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-7-interview-verify-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-7-interview-verify-trace.zip");
         vendorContext7.close();
-        DashboardManager.log("[REPORT] 🎉 Vendor Final Interview Verification Completed.");
+        DashboardManager.log("[STEP 16] ✅ Vendor Interview Verification Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 17. OFFER JOB & DEPLOY FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Offer Job & Deployment Flow...");
-
-        // Bring Admin Page to Front
+        // ── STEP 17: Offer Job & Deploy ───────────────────────────────
+        DashboardManager.log("\n[STEP 17] 💼 Offer Job & Deploy Flow");
         page.bringToFront();
         page.waitForTimeout(1000);
 
         OfferJobPage offerPage = new OfferJobPage(page);
-
-        // A. Admin: Update Status to Offer Job & Deploy
         offerPage.navigateAndOpenRequirement(firstReqName);
         offerPage.openCandidateAndVerifyStatus("Candidate 1");
         offerPage.updateStatusToOfferJob();
         offerPage.deployCandidate(JD_FILE_PATH);
+        DashboardManager.log("[STEP 17a] ✅ Admin Deploy Completed.");
 
-        // B. Vendor: Verify Deployment
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying Deployment...");
+        // Save admin trace after deploy
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-06-deploy-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-06-deploy-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin deploy trace: " + e.getMessage());
+        }
+
+        DashboardManager.log("\n[STEP 17b] 🏢 Vendor: Verifying Deployment");
         BrowserContext vendorContext8 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        // ⭐ TRACING FOR VENDOR 8
         vendorContext8.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPage8 = vendorContext8.newPage();
 
         OfferJobPage vendorVerifyDeploy = new OfferJobPage(vendorPage8);
         vendorVerifyDeploy.vendorVerifyDeployedStatus(
                 "https://uat-vendor.embtalent.ai/login",
-                "bharat.pandey+1@emb.global",//deev=bharat.pandey@emb.global, uat=bharat.pandey+1@emb.global
+                "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
 
         vendorContext8.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-8-deploy-verify-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-8-deploy-verify-trace.zip");
         vendorContext8.close();
-        DashboardManager.log("[REPORT] ✅ Full E2E Journey Completed Successfully!");
+        DashboardManager.log("[STEP 17] ✅ Deploy Flow Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 18. HOLD, REJECT & SHARE WITH CLIENT FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Hold, Reject & Share with Client Flow...");
-
+        // ── STEP 18: Hold, Reject & Share with Client ─────────────────
+        DashboardManager.log("\n[STEP 18] 🔄 Hold, Reject & Share with Client Flow");
         page.bringToFront();
         page.waitForTimeout(1000);
-        HoldRejectSentClientPage postDeployPage = new HoldRejectSentClientPage(page);
 
-        // A. Admin Side Actions
+        HoldRejectSentClientPage postDeployPage = new HoldRejectSentClientPage(page);
         postDeployPage.processCandidatesOnAdmin(firstReqName);
         postDeployPage.printFinalSummaryAdmin();
 
-        // B. Vendor Side Verification
-        DashboardManager.log("\n[REPORT] 🏢 Vendor: Verifying All Final Statuses...");
-        BrowserContext vendorContextFinal = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-        // ⭐ TRACING FOR VENDOR FINAL
-        vendorContextFinal.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        // Save admin trace after hold/reject
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-07-hold-reject-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-07-hold-reject-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin hold/reject trace: " + e.getMessage());
+        }
 
+        DashboardManager.log("\n[STEP 18b] 🏢 Vendor: Verifying All Final Statuses");
+        BrowserContext vendorContextFinal = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+        vendorContextFinal.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
         Page vendorPageFinal = vendorContextFinal.newPage();
 
         HoldRejectSentClientPage vendorFinalVerify = new HoldRejectSentClientPage(vendorPageFinal);
@@ -498,103 +593,148 @@ public class CreateRequirementTest {
         );
 
         vendorContextFinal.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-final-statuses-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-final-statuses-trace.zip");
         vendorContextFinal.close();
-        DashboardManager.log("[REPORT] ✅ Full E2E Multi-Candidate Journey Completed Successfully!");
+        DashboardManager.log("[STEP 18] ✅ Hold/Reject/Share Flow Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 19. ALLOW RESUBMISSION FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Allow Resubmission Flow...");
+        // ── STEP 19: Allow Resubmission ───────────────────────────────
+        DashboardManager.log("\n[STEP 19] 🔁 Allow Resubmission Flow");
         page.bringToFront();
-        AllowResubmissionPage resubmitPage = new AllowResubmissionPage(page);
 
-        // Admin Action
+        AllowResubmissionPage resubmitPage = new AllowResubmissionPage(page);
         resubmitPage.allowResubmissionsOnAdmin(firstReqName);
 
-        // Vendor Action
+        // Save admin trace after resubmission
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-08-resubmission-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-08-resubmission-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin resubmission trace: " + e.getMessage());
+        }
+
         BrowserContext vendorContextResubmit = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-        // ⭐ TRACING FOR VENDOR RESUBMIT
         vendorContextResubmit.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page vendorPageResubmit = vendorContextResubmit.newPage();
-        AllowResubmissionPage vendorResubmit = new AllowResubmissionPage(vendorPageResubmit);
 
+        AllowResubmissionPage vendorResubmit = new AllowResubmissionPage(vendorPageResubmit);
         vendorResubmit.vendorPerformResubmission(
                 "https://uat-vendor.embtalent.ai/login",
                 "bharat.pandey+1@emb.global",
                 "Emb@1234",
                 firstReqName
         );
+
         vendorContextResubmit.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-resubmit-trace.zip")));
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-resubmit-trace.zip");
         vendorContextResubmit.close();
+        DashboardManager.log("[STEP 19] ✅ Resubmission Flow Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 20. CLIENT SHORTLIST & REJECT FLOW
-        // ──────────────────────────────────────────────────────────────
-        DashboardManager.log("\n[REPORT] 🚀 Starting Client Shortlist Flow...");
-
-        // 1. Client Side: Shortlist
+        // ── STEP 20: Client Shortlist & Reject ────────────────────────
+        DashboardManager.log("\n[STEP 20] 🤝 Client Shortlist & Reject Flow");
         BrowserContext clientContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-        // ⭐ TRACING FOR CLIENT PORTAL
         clientContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
-
         Page clientPage = clientContext.newPage();
+
         ClientShortlistPage clientFlow = new ClientShortlistPage(clientPage);
 
+        DashboardManager.log("[STEP 20a] 🤝 Client: Login & Shortlist");
         clientFlow.loginAndShortlist("https://uat-client.embtalent.ai/login", "AutoTest@yopmail.com", "Emb@1234", firstReqName);
 
-        // 2. Admin Side: Verify Shortlist
+        // Save client trace after shortlist — before reject (crash safety)
+        try {
+            clientContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-20a-shortlist-trace.zip")));
+            DashboardManager.log("   💾 Client trace saved → target/client-20a-shortlist-trace.zip");
+            clientContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save client shortlist trace: " + e.getMessage());
+        }
+
+        DashboardManager.log("[STEP 20b] 👮 Admin: Verify Shortlist");
         page.bringToFront();
         ClientShortlistPage adminVerify = new ClientShortlistPage(page);
         adminVerify.verifyShortlistOnAdmin(firstReqName);
 
-        // 3. Client Side: Reject
+        // Save admin trace after shortlist verify
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-09-client-shortlist-verify-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-09-client-shortlist-verify-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin shortlist verify trace: " + e.getMessage());
+        }
+
+        DashboardManager.log("[STEP 20c] 🤝 Client: Reject Candidate");
         clientPage.bringToFront();
         clientFlow.clientRejectCandidate(firstReqName);
 
-        // 4. Admin Side: Verify Rejection
+        // Save client trace after reject
+        try {
+            clientContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-20c-reject-trace.zip")));
+            DashboardManager.log("   💾 Client trace saved → target/client-20c-reject-trace.zip");
+            clientContext.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save client reject trace: " + e.getMessage());
+        }
+
+        DashboardManager.log("[STEP 20d] 👮 Admin: Verify Rejection");
         page.bringToFront();
         adminVerify.verifyRejectionOnAdmin(firstReqName);
 
         clientContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-portal-trace.zip")));
+        DashboardManager.log("   💾 Client final trace saved → target/client-portal-trace.zip");
         clientContext.close();
+        DashboardManager.log("[STEP 20] ✅ Client Shortlist & Reject Flow Completed.");
 
-        // ──────────────────────────────────────────────────────────────
-        // 21. REQUIREMENT COMPLETION FLOW
-        // ──────────────────────────────────────────────────────────────
+        // Save admin trace after rejection verify
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-10-rejection-verify-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-10-rejection-verify-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin rejection verify trace: " + e.getMessage());
+        }
+
+        // ── STEP 21: Requirement Completion ───────────────────────────
+        DashboardManager.log("\n[STEP 21] 🏁 Requirement Completion Flow");
         RequirementCompletedPage completedFlow = new RequirementCompletedPage(page);
 
-        // A. Admin Side: Deploy Candidate 2
+        DashboardManager.log("[STEP 21a] 👮 Admin: Deploy Candidate 2");
         completedFlow.adminDeployCandidate(firstReqName, "Candidate 2", "bharat pvt ltd", JD_FILE_PATH);
 
-        // B. Vendor Side: Verify Completion
-        BrowserContext vendorCtx = browser.newContext();
+        // Save admin trace after completion deploy
+        try {
+            context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/admin-11-completion-deploy-trace.zip")));
+            DashboardManager.log("   💾 Admin trace saved → target/admin-11-completion-deploy-trace.zip");
+            context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save admin completion deploy trace: " + e.getMessage());
+        }
 
-        // ⭐ TRACING FOR VENDOR COMPLETION
+        DashboardManager.log("[STEP 21b] 🏢 Vendor: Verify Completion Status");
+        BrowserContext vendorCtx = browser.newContext();
         vendorCtx.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
 
         RequirementCompletedPage vendorVerify = new RequirementCompletedPage(vendorCtx.newPage());
         vendorVerify.verifyPortalStatus("Vendor", "https://uat-vendor.embtalent.ai/login", "bharat.pandey+1@emb.global", "Emb@1234", firstReqName);
 
         vendorCtx.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-completion-verify-trace.zip")));
-
+        DashboardManager.log("   💾 Vendor trace saved → target/vendor-completion-verify-trace.zip");
         vendorCtx.close();
 
-        // C. Client Side: Verify Completion
+        DashboardManager.log("[STEP 21c] 🤝 Client: Verify Completion Status");
         BrowserContext clientCtx = browser.newContext();
-
-        // ⭐ TRACING FOR CLIENT COMPLETION
         clientCtx.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
 
         RequirementCompletedPage clientVerify = new RequirementCompletedPage(clientCtx.newPage());
         clientVerify.verifyPortalStatus("Client", "https://uat-client.embtalent.ai/login", "AutoTest@yopmail.com", "Emb@1234", firstReqName);
 
         clientCtx.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/client-completion-verify-trace.zip")));
-
+        DashboardManager.log("   💾 Client trace saved → target/client-completion-verify-trace.zip");
         clientCtx.close();
-    }
 
-    // <-- End of createFourRequirementsAtOnce method
+        DashboardManager.log("\n[REPORT] ✅ Full E2E Journey Completed Successfully!");
+    }
 
     private String verifyTopRequirements(int limit) {
         DashboardManager.log("\n[REPORT] 🔍 Verifying Table Data...");
@@ -613,7 +753,7 @@ public class CreateRequirementTest {
         String firstTitle = "";
         for (int i = 0; i < limit; i++) {
             Locator row = rows.nth(i);
-            String title = row.locator("td:nth-child(2)").innerText().trim();
+            String title = row.locator("td:nth-child(2) a span.cursor-pointer").innerText().trim();
             String status = row.locator("td:nth-child(4)").innerText().trim();
 
             if (i == 0) firstTitle = title;
@@ -626,13 +766,14 @@ public class CreateRequirementTest {
         }
         return firstTitle;
     }
+
     @AfterEach
     void tearDown() {
         if (context != null) {
             try {
-                // Use a dynamic name or just be sure to delete the old one manually
                 context.tracing().stop(new Tracing.StopOptions()
                         .setPath(Paths.get("target/admin-trace-latest.zip")));
+                DashboardManager.log("   💾 Admin fallback trace saved → target/admin-trace-latest.zip");
             } catch (Exception e) {
                 System.err.println("Failed to save Admin trace: " + e.getMessage());
             }
@@ -645,12 +786,8 @@ public class CreateRequirementTest {
         if (browser != null) browser.close();
         if (playwright != null) playwright.close();
 
-        // 🚀 3. SAVE THE DASHBOARD & SEND EMAIL
         DashboardManager.flushReport();
-
-        // Put the email address you want to send the dashboard to here:
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
-        //EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
     }
 }

@@ -32,12 +32,20 @@ public class SubmitCandidatePage {
     private final Locator emailInput;
     private final Locator passwordInput;
     private final Locator loginBtn;
+
+    // Project & Search Locators
     private final Locator projectTab;
+    private final Locator projectSearchInput;
+
     private final Locator acceptBtn;
     private final Locator endProjectBtn;
+    private final Locator shortlistedCandidateTab;
+
     private final Locator addNewMemberBtn;
-    private final Locator jdUploadInput;
-    private final Locator importResumeBtn;
+
+    // 🚀 FIX: Targeting the SECOND file input natively
+    private final Locator resumeUploadInput;
+
     private final Locator nameInput;
     private final Locator memberEmailInput;
     private final Locator linkedinInput;
@@ -94,15 +102,19 @@ public class SubmitCandidatePage {
         this.passwordInput = page.locator("input[name='password']");
         this.loginBtn = page.locator("button[type='submit']").filter(new Locator.FilterOptions().setHasText("Login"));
 
-        // Dashboard
+        // Dashboard & Search
         this.projectTab = page.locator("a[href='/projects']");
+        this.projectSearchInput = page.locator("input[placeholder*='Find a project by']");
+
         this.acceptBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Accept"));
         this.endProjectBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("End Project"));
+        this.shortlistedCandidateTab = page.locator("div.cursor-pointer").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Shortlisted Candidate$")));
 
         // Member Form
         this.addNewMemberBtn = page.locator("button:has-text('Add New Member')");
-        this.jdUploadInput = page.locator("input[type='file']").first();
-        this.importResumeBtn = page.getByRole(AriaRole.BUTTON).filter(new Locator.FilterOptions().setHasText("Import from resume"));
+
+        // 🚀 FIX: Use .nth(1) to target the SECOND invisible file input on the page directly
+        this.resumeUploadInput = page.locator("input[type='file']").nth(1);
 
         this.nameInput = page.locator("input[name='name']");
         this.memberEmailInput = page.locator("input[name='email']").last();
@@ -324,27 +336,34 @@ public class SubmitCandidatePage {
         }
     }
 
+    // 🚀 NEW FLOW: Search and Open Project
     public void navigateToProject(String projectName) {
-
-        //0 Clicking on the Project tab
+        DashboardManager.log("📂 Navigating to Projects tab...");
         projectTab.click();
         page.waitForTimeout(2000);
-        // 1. Wait for the cards to actually load on the page
-        page.locator("a.cursor-pointer").first().waitFor();
 
-        // 2. Find the specific card
-        Locator projectCard = page.locator("a.cursor-pointer")
-                .filter(new Locator.FilterOptions().setHasText(projectName));
+        // Strip Admin prefix if it exists
+        String cleanName = projectName.contains("ReqTest-") ? projectName.substring(projectName.indexOf("ReqTest-")) : projectName;
+
+        DashboardManager.log("🔎 Searching for Project: " + cleanName);
+        projectSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        projectSearchInput.fill(cleanName);
+        page.waitForTimeout(2000); // Wait for results to filter
+
+        // Find the specific card
+        Locator projectCard = page.locator("a.cursor-pointer").filter(new Locator.FilterOptions().setHasText(cleanName));
 
         if (projectCard.count() > 0) {
             projectCard.first().click();
         } else {
-            // Fallback: click the very first available card
-            page.locator("a.cursor-pointer").first().click();
+            DashboardManager.log("⚠️ Project card not found, trying generic click...");
+            page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName)).first().click();
         }
+        page.waitForTimeout(2000);
     }
 
 
+    // 🚀 NEW FLOW: Accept Project & Switch to Shortlisted Candidate Tab
     public void acceptProject() {
         DashboardManager.log("👍 Checking Project Status...");
         page.waitForTimeout(2000);
@@ -352,16 +371,22 @@ public class SubmitCandidatePage {
             page.locator("h1").first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
             Locator anyBtn = acceptBtn.or(endProjectBtn);
             anyBtn.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+
             if (endProjectBtn.isVisible()) {
-                DashboardManager.log("ℹ️ Project is ALREADY ACCEPTED. Skipping acceptance.");
-                return;
-            }
-            if (acceptBtn.isVisible()) {
+                DashboardManager.log("ℹ️ Project is ALREADY ACCEPTED. (End Project button visible)");
+            } else if (acceptBtn.isVisible()) {
                 page.waitForTimeout(1000);
                 acceptBtn.click();
                 DashboardManager.log("✅ Clicked 'Accept' button.");
                 page.waitForTimeout(2000);
             }
+
+            // Switch to Shortlisted Candidate Tab
+            DashboardManager.log("   -> Switching to 'Shortlisted Candidate' Tab...");
+            shortlistedCandidateTab.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            shortlistedCandidateTab.click();
+            page.waitForTimeout(2000);
+
         } catch (Exception e) {
             DashboardManager.log("❌ Error checking project status: " + e.getMessage());
         }
@@ -370,7 +395,7 @@ public class SubmitCandidatePage {
     public void addMembers(int count, String jdPath) {
         DashboardManager.log("👥 Starting to add " + count + " members...");
         for (int i = 0; i < count; i++) {
-            String candidateName = "Candidate " + (i + 1);
+            String candidateName = "Candidate " + (i + 10);
             DashboardManager.log("\n   ➕ Adding Member #" + (i + 1) + " (" + candidateName + ")");
             try {
                 Locator addBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Add New Member")).first();
@@ -384,28 +409,65 @@ public class SubmitCandidatePage {
     }
 
     private void fillMemberDetails(String jdPath, String candidateName) {
-        DashboardManager.log("      📤 Uploading Resume...");
-
-        try {
-            if (!Files.exists(Paths.get(jdPath))) throw new RuntimeException("Resume file not found!");
-            jdUploadInput.setInputFiles(Paths.get(jdPath));
-            page.waitForTimeout(2000);
-            importResumeBtn.click();
-            DashboardManager.log("      ⏳ Waiting 15s for extraction...");
-            page.waitForTimeout(15000);
-            page.locator("div:has-text('Resume details extracted!'), div:has-text('Failed to extract')")
-                    .first().waitFor(new Locator.WaitForOptions().setTimeout(80000));
-            DashboardManager.log("      ℹ️ Extraction toast detected.");
-        } catch (Exception ignored) {
-            DashboardManager.log("      ⚠️ Extraction toast missing or timed out.");
-        }
-
         DashboardManager.log("      📝 Filling Basic Info...");
         try {
             nameInput.fill(candidateName);
             memberEmailInput.fill("candidate" + System.currentTimeMillis() + "@yopmail.com");
             linkedinInput.fill("https://in.linkedin.com/company/embglobal");
             portfolioInput.fill("https://github.com/emb-ai");
+            page.waitForTimeout(2000);
+
+
+            // ──────────────────────────────────────────────────────────────
+            // 🚀 FIX: Native Playwright Input Injection (Bypasses UI overlays)
+            // ──────────────────────────────────────────────────────────────
+
+
+            // ──────────────────────────────────────────────────────────────
+            // 🚀 FIX: Mimic real human clicking the entire Upload Label area
+            // ──────────────────────────────────────────────────────────────
+            DashboardManager.log("      📤 Clicking Upload field area and attaching Resume...");
+            try {
+                if (!Files.exists(Paths.get(jdPath))) throw new RuntimeException("Resume file not found at " + jdPath);
+
+
+                // 1. Locate the entire grey label area that acts as the click zone
+                Locator uploadLabel = page.locator("label").filter(new Locator.FilterOptions().setHasText("Select a DOC or PDF")).nth(1);
+                uploadLabel.scrollIntoViewIfNeeded();
+
+
+                // 2. Tell Playwright to intercept the OS file dialog window
+                FileChooser fileChooser = page.waitForFileChooser(() -> {
+                    // Click the label. (force=true is used because the invisible input[type='file'] perfectly covers it)
+                    uploadLabel.click(new Locator.ClickOptions().setForce(true));
+                });
+
+
+                // 3. Drop the file into the intercepted dialog window AND wait for the API response
+                Response uploadResponse = page.waitForResponse(
+                        response -> response.url().contains("/api/v1/files/upload") && response.request().method().equals("POST"),
+                        () -> {
+                            fileChooser.setFiles(Paths.get(jdPath));
+                        }
+                );
+
+
+                // Give the UI time to show the "Uploading..." animation and settle
+                page.waitForTimeout(2000);
+
+
+                // 4. Validate the API response status
+                if (uploadResponse.status() == 200 || uploadResponse.status() == 201) {
+                    DashboardManager.log("      ✅ Resume Attached Successfully. (API Status: " + uploadResponse.status() + ")");
+                } else {
+                    DashboardManager.log("      ❌ Resume Attached but API Failed! Status: " + uploadResponse.status());
+                    DashboardManager.log("      ⚠️ Error Details: " + uploadResponse.text());
+                }
+            } catch (Exception e) {
+                DashboardManager.log("      ❌ Failed to upload Resume: " + e.getMessage());
+            }
+
+
             experienceInput.fill("2");
             page.waitForTimeout(2000);
             DashboardManager.log("      ✅ Basic Info Filled (" + candidateName + ").");
@@ -413,9 +475,11 @@ public class SubmitCandidatePage {
             DashboardManager.log("      ❌ Basic Info Failed.");
         }
 
+
         selectRole("Frontend Engineer");
         page.waitForTimeout(2000);
         addSkills(Arrays.asList("React", "Java", "Python", "javascript", "angular","HTML5","React"));
+
 
         // ──────────────────────────────────────────────────────────────
         // ⚡️ DYNAMIC EDUCATION LOGIC ADDED HERE ⚡️
@@ -423,8 +487,6 @@ public class SubmitCandidatePage {
         // Example: Graduation
         addEducation("Graduation", "BTech", "Computer Science", "FSIT", "2022-12", "80.02");
 
-        // Example: You can swap this line with 10th to test the logic:
-        // addEducation("10th", "", "General", "RPVV", "2020-03", "85.00");
 
         DashboardManager.log("      🏆 Adding Award...");
         try {
@@ -440,6 +502,7 @@ public class SubmitCandidatePage {
             DashboardManager.log("      ❌ Failed to add Award: " + e.getMessage());
         }
 
+
         DashboardManager.log("      📜 Adding Certificate...");
         try {
             addCertBtn.click();
@@ -449,12 +512,12 @@ public class SubmitCandidatePage {
             certDescInput.fill("Automated Cert Description");
             certUploadInput.setInputFiles(Paths.get(jdPath));
 
-            // ---> NEW EXPIRED LOGIC ADDED HERE <---
+
             DashboardManager.log("         -> Checking 'expired' box and filling expiry date...");
             certExpiredCheckbox.click();
             page.waitForTimeout(500);
             certExpiryDateInput.fill("2032-12-20"); // Adjusted format for standard date input type
-            // --------------------------------------
+
 
             saveCertBtn.click();
             saveCertBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN).setTimeout(5000));
@@ -464,6 +527,7 @@ public class SubmitCandidatePage {
             DashboardManager.log("      ❌ Failed to add Certificate: " + e.getMessage());
         }
 
+
         DashboardManager.log("      ⚙️ Selecting Engagement Details...");
         try {
             Locator resType = page.locator("button[role='combobox']").nth(1);
@@ -471,6 +535,7 @@ public class SubmitCandidatePage {
             resType.click();
             page.getByRole(AriaRole.OPTION).filter(new Locator.FilterOptions().setHasText("Both")).click();
             page.waitForTimeout(1000);
+
 
             currentCtcInput.fill("1200000");
             expectedCtcInput.fill("2000000");
@@ -481,6 +546,7 @@ public class SubmitCandidatePage {
         } catch (Exception e) {
             DashboardManager.log("      ❌ Failed Engagement/Financials.");
         }
+
 
         DashboardManager.log("      ⏳ Selecting Notice Period...");
         try {
@@ -493,6 +559,7 @@ public class SubmitCandidatePage {
             DashboardManager.log("      ❌ Failed Notice Period.");
         }
 
+
         DashboardManager.log("      📍 Selecting Location...");
         try {
             locationDropdown.click();
@@ -504,7 +571,9 @@ public class SubmitCandidatePage {
             DashboardManager.log("      ❌ Failed Location.");
         }
 
+
         addServiceableLocations();
+
 
         DashboardManager.log("      🌐 Selecting Timezone...");
         try {
@@ -516,17 +585,21 @@ public class SubmitCandidatePage {
         } catch (Exception e) {
             DashboardManager.log("      ❌ Failed Timezone.");
         }
+        //page.waitForTimeout(10000);
+
 
         DashboardManager.log("      💾 Saving Member...");
         try {
             availableBtn.scrollIntoViewIfNeeded();
             availableBtn.click();
 
+
             saveMemberDetailsBtn.scrollIntoViewIfNeeded();
             if (!saveMemberDetailsBtn.isEnabled()) {
                 DashboardManager.log("      ⚠️ Save button is disabled! Form might be incomplete.");
             }
             saveMemberDetailsBtn.click();
+
 
             page.getByText("Team member added successfully!", new Page.GetByTextOptions().setExact(false))
                     .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(20000));
@@ -537,46 +610,115 @@ public class SubmitCandidatePage {
         }
     }
 
+
+
+    // ──────────────────────────────────────────────────────────────
+    // ⚡️ NEW: REMOVE CANDIDATES WITH RESUME/EDUCATION ALERTS ⚡️
+    // ──────────────────────────────────────────────────────────────
+    public void removeCandidatesWithAlerts() {
+        DashboardManager.log("   -> Scanning candidate list for missing Resume/Education alerts...");
+        page.waitForTimeout(2000); // Give table time to stabilize
+
+        while (true) {
+            Locator rows = page.locator("tbody tr");
+            int count = rows.count();
+            boolean removedAny = false;
+
+            for (int i = 0; i < count; i++) {
+                Locator row = rows.nth(i);
+
+                // Find alert badges specifically inside this row (using the specific classes from your HTML)
+                Locator alertBadge = row.locator("span[class*='text-warning-active']").filter(new Locator.FilterOptions().setHasText(Pattern.compile("Resume|Education")));
+
+                if (alertBadge.count() > 0) {
+                    String candidateName = "Unknown Candidate";
+                    try {
+                        candidateName = row.locator("h3").first().innerText().trim();
+                    } catch (Exception e) { /* Ignore if it fails to grab name */ }
+
+                    DashboardManager.log("      ⚠️ Missing Resume/Education detected for [" + candidateName + "]. Removing...");
+
+                    // Click the specific remove button inside this row
+                    Locator removeBtn = row.locator("button").filter(new Locator.FilterOptions().setHasText("Remove"));
+                    removeBtn.click();
+
+                    // Check Toast
+                    try {
+                        page.getByText("Candidate removed from shortlist successfully", new Page.GetByTextOptions().setExact(false))
+                                .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+                        DashboardManager.log("      ✅ Successfully removed " + candidateName);
+                    } catch (Exception e) {
+                        DashboardManager.log("      ❌ Success toast not found for removal.");
+                    }
+
+                    // Wait for the DOM to update and break to restart the scan
+                    page.waitForTimeout(2000);
+                    removedAny = true;
+                    break;
+                }
+            }
+
+            // If we loop through the entire table and find no alerts, we can exit the while loop
+            if (!removedAny) {
+                DashboardManager.log("   ✅ Clean scan: No candidates have alerts.");
+                break;
+            }
+        }
+    }
+
     public void submitCandidates() {
+
+        // 🚀 First, dynamically remove anyone missing a resume or education
+        removeCandidatesWithAlerts();
         DashboardManager.log("🚀 Submitting Candidates for Interview...");
         try {
-            // 1. Click the Submit button
-            submitCandidatesBtn.click();
-            DashboardManager.log("      -> Submit button clicked. Waiting for process completion...");
+            // 1. Check if Submit button is visible — if not, candidates may already be submitted
+            Locator submitBtn = page.locator("button")
+                    .filter(new Locator.FilterOptions().setHasText("Submit Candidates for Interview"));
 
-            // 2. Wait for the Success Toast (even if it's quick, it signals the start of processing)
-            page.getByText("Submitted successful!", new Page.GetByTextOptions().setExact(false))
-                    .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+            if (!submitBtn.isVisible()) {
+                DashboardManager.log("   ℹ️ Submit button not visible — candidates may already be submitted. Skipping.");
+            } else {
+                submitBtn.click();
+                DashboardManager.log("      -> Submit button clicked. Waiting for toast...");
 
-            // 3. ⏳ WAIT FOR 20 SECONDS
-            DashboardManager.log("      ⏳ Waiting 20 seconds before switching to Interview tab...");
-            page.waitForTimeout(26000);
+                // 2. Wait for toast up to 30s (was 10s — too tight on slow network)
+                try {
+                    page.getByText("Submitted successful!", new Page.GetByTextOptions().setExact(false))
+                            .waitFor(new Locator.WaitForOptions()
+                                    .setState(WaitForSelectorState.VISIBLE).setTimeout(30000));
+                    DashboardManager.log("      ✅ Submission toast received.");
+                } catch (Exception e) {
+                    DashboardManager.log("      ⚠️ Toast not found within 30s — continuing anyway.");
+                }
 
-            // 4. Click on the Interview Tab (using the specific class and text)
+                DashboardManager.log("      ⏳ Waiting 26 seconds before switching to Interview tab...");
+                page.waitForTimeout(26000);
+            }
+
+            // 3. Click Interview tab
             DashboardManager.log("      🖱 Clicking on the 'Interview' tab...");
             page.locator("div.cursor-pointer")
                     .filter(new Locator.FilterOptions().setHasText("Interview"))
                     .first()
                     .click();
 
-            // 5. 🚀 CRITICAL WAIT: Wait for the candidates to actually appear with "Applied" status
-            // We target the status badge specifically with a 45-second timeout
-            DashboardManager.log("      ⏳ Waiting for candidates to become visible in the table (Max 45s)...");
+            // 4. Wait for Candidate 1 row with Applied status — confirms submission
+            DashboardManager.log("      ⏳ Waiting for Candidate 1 to appear with Applied status (max 90s)...");
+            page.locator("tr.group")
+                    .filter(new Locator.FilterOptions().setHasText("Candidate 1"))
+                    .first()
+                    .locator("span.status-blue-text")
+                    .first()
+                    .waitFor(new Locator.WaitForOptions()
+                            .setState(WaitForSelectorState.VISIBLE)
+                            .setTimeout(90000));
 
-            Locator appliedStatusBadge = page.locator("tr.group").first().locator("span").filter(new Locator.FilterOptions().setHasText("Applied"));
-
-            appliedStatusBadge.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(90000));
-
-            DashboardManager.log("      ✅ Candidates are now visible and processed.");
-
-            // 6. Final small buffer to ensure all rows in the batch have finished rendering
+            DashboardManager.log("      ✅ Candidate 1 is visible with status — submission confirmed.");
             page.waitForTimeout(2000);
 
         } catch (Exception e) {
             DashboardManager.log("❌ Submission took too long or failed: " + e.getMessage());
-            // Take a screenshot to debug if the table is stuck or empty
             page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get("target/submission_timeout.png")));
         }
     }

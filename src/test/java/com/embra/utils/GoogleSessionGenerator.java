@@ -7,7 +7,7 @@ public class GoogleSessionGenerator {
     public static void main(String[] args) {
         try (Playwright playwright = Playwright.create()) {
             // 1. Open a visible browser
-            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setChannel("chrome").setHeadless(false));
             BrowserContext context = browser.newContext();
             Page page = context.newPage();
 

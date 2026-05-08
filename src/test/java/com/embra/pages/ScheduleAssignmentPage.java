@@ -94,7 +94,7 @@ public class ScheduleAssignmentPage {
         page.waitForTimeout(1000);
 
         DashboardManager.log("   -> Opening Candidate: " + candidateName);
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
+        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName)).first(); // 🚀 FIX: Prevent strict mode violation
 
         // Click the "View" eye icon in that row
         candidateRow.locator("button[title='View Details']").click();
@@ -258,7 +258,8 @@ public class ScheduleAssignmentPage {
 
         // 3. Verify Candidate Status & Open
         DashboardManager.log("   -> Opening Candidate 1...");
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        // 🚀 FIX: Explicitly target Candidate 1 and use .first() to prevent strict mode violations
+Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first();
         Locator ongoingBadge = candidateRow.locator("span.status-blue-text");
         if (ongoingBadge.isVisible() && ongoingBadge.innerText().contains("Assignment Ongoing")) {
             DashboardManager.log("      ✅ Candidate Status: Assessment Ongoing");
@@ -359,7 +360,7 @@ public class ScheduleAssignmentPage {
 
         candidatesTab.click();
         page.waitForTimeout(1000);
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
+        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName)).first(); // 🚀 FIX: Prevent strict mode violation
         candidateRow.locator("button[title='View Details']").click();
         page.waitForTimeout(2000);
 
@@ -436,26 +437,37 @@ public class ScheduleAssignmentPage {
         page.waitForTimeout(2000);  // simple wait for list to load
 
 
-        // 🚀 FIX: Strip Admin prefix here as well
+        // Strip Admin prefix if present
         String cleanName = reqName.contains("ReqTest-")
                 ? reqName.substring(reqName.indexOf("ReqTest-"))
                 : reqName;
 
-        DashboardManager.log("   -> Searching for Project (Cleaned): " + cleanName);
+        DashboardManager.log("   -> Searching for Project: " + cleanName);
 
-        Locator projectTitle = page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName));
+// 1. Fill search field
+        Locator projectSearchInput = page.locator("input[placeholder='Find a project by: Name, Current status']");
+        projectSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+        projectSearchInput.fill(cleanName);
+        page.waitForTimeout(2000);
 
-        if (projectTitle.count() == 0) {
-            DashboardManager.log("      ❌ Project '" + cleanName + "' not found on Projects page!");
-        } else {
-            projectTitle.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-            projectTitle.first().click();
+// 2. Click the project card from search results
+        Locator projectCard = page.locator("a[href*='projects/details']")
+                .filter(new Locator.FilterOptions().setHasText(cleanName)).first();
+
+        try {
+            projectCard.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+            projectCard.click();
+            DashboardManager.log("      ✅ Clicked Project: " + cleanName);
             page.waitForTimeout(2000);
+        } catch (Exception e) {
+            DashboardManager.log("      ❌ Project card not found for: " + cleanName);
+            throw e;
         }
 
 
         DashboardManager.log("   -> Opening Candidate 1...");
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
+        // 🚀 FIX: Explicitly target Candidate 1 and use .first() to prevent strict mode violations
+Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first();
 
         Locator completedBadge = candidateRow.locator("span.status-green-text").filter(new Locator.FilterOptions().setHasText("Assignment Completed"));
         if (completedBadge.isVisible()) {

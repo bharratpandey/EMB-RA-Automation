@@ -199,7 +199,7 @@ public class VendorOnboardingTest {
         logger.info("PHASE 8: VENDOR PORTAL FINAL VERIFICATION");
         logger.info("--------------------------------------------------");
 
-        page.navigate("https://uat-vendor.embtalent.ai/login");
+        page.navigate("https://dev-vendor.embtalent.ai/login");
 
         // 1. Conditional Login: Only log in if we aren't already at the dashboard
         if (page.locator("input[name='email']").isVisible()) {

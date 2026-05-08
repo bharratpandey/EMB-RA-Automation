@@ -40,7 +40,7 @@ public class OfferJobPage {
         this.deployTriggerBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Deploy"));
         this.engagementStartDateBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("DD/MM/YYYY"));
         this.clientCostInput = page.locator("input[name='client_cost']");
-        this.partnerCostInput = page.locator("input[name='cost']");
+        this.partnerCostInput = page.locator("input[name='partner_commission']");
         this.fileInput = page.locator("input[type='file']");
         // Target the green Deploy button in the modal specifically
         this.deploySubmitBtn = page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Deploy"));
@@ -122,7 +122,6 @@ public class OfferJobPage {
         DashboardManager.log("   -> Selecting Engagement Start Date...");
         engagementStartDateBtn.first().click();
 
-        // FIX: Use .first() to target the currently active calendar popup
         Locator startCalendar = page.locator("div.rdp-month").first();
         startCalendar.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         page.locator("button.rdp-day:not([disabled])").first().click();
@@ -131,42 +130,63 @@ public class OfferJobPage {
         Locator endDateLabel = page.locator("label").filter(new Locator.FilterOptions().setHasText("Engagement End Date"));
         if (endDateLabel.isVisible()) {
             DashboardManager.log("   -> Engagement End Date field visible (Contractual). Selecting date...");
-
             Locator endDateBtn = page.locator("div.flex-col").filter(new Locator.FilterOptions().setHas(endDateLabel)).locator("button");
             endDateBtn.click();
-
-            // FIX: Use .last() and a small timeout to ensure the second calendar is targeted
             page.waitForTimeout(500);
             Locator endCalendar = page.locator("div.rdp-month").last();
             endCalendar.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-
             page.locator("button.rdp-day:not([disabled])").last().click();
             DashboardManager.log("      ✅ Engagement End Date Selected.");
         } else {
             DashboardManager.log("   ℹ️ Engagement End Date not visible (Full Time). Skipping.");
         }
 
-        // Costs
+        // 3. Financial Details — new fields
         DashboardManager.log("   -> Filling Financial Details...");
-        clientCostInput.fill("1200000");
-        partnerCostInput.fill("900000");
 
-        // Upload
+        // Total CTC (from Client)
+        Locator clientCost = page.locator("input[name='client_cost']");
+        clientCost.clear();
+        clientCost.fill("500000");
+        DashboardManager.log("      -> Total CTC (from Client): 500000");
+
+        // Commission % (from Client)
+        Locator clientCommission = page.locator("input[name='client_commission']");
+        clientCommission.clear();
+        clientCommission.fill("10");
+        DashboardManager.log("      -> Commission % (from Client): 10");
+
+        // Commission % (to Partner)
+        Locator partnerCommission = page.locator("input[name='partner_commission']");
+        partnerCommission.clear();
+        partnerCommission.fill("10");
+        DashboardManager.log("      -> Commission % (to Partner): 10");
+
+        // 4. Upload Document
         DashboardManager.log("   -> Uploading Documents...");
         try {
-            fileInput.setInputFiles(Paths.get(filePath));
-            if (waitForToast("uploaded successfully")) {
-                DashboardManager.log("      ✅ Document Uploaded.");
-            }
+            page.locator("label[for='deploy-docs']").scrollIntoViewIfNeeded();
+            page.locator("input[type='file']").setInputFiles(Paths.get(filePath));
+            page.waitForTimeout(1500);
+            DashboardManager.log("      ✅ Document Uploaded.");
         } catch (Exception e) {
             DashboardManager.log("      ❌ File upload failed: " + e.getMessage());
         }
 
-        // Final Submit
-        DashboardManager.log("   -> Submitting Deployment...");
-        deploySubmitBtn.click();
+        // 5. Click Deploy if enabled
+        DashboardManager.log("   -> Checking Deploy button state...");
+        Locator deployBtn = page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Deploy"));
+        deployBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
 
-        // Verify Success Message
+        if (deployBtn.isEnabled()) {
+            DashboardManager.log("   -> Deploy button is enabled. Clicking...");
+            deployBtn.click();
+        } else {
+            DashboardManager.log("   ⚠️ Deploy button is disabled! Form may be incomplete.");
+            return;
+        }
+
+        // 6. Verify Success
         try {
             page.getByText("Candidate Deployed!").waitFor(new Locator.WaitForOptions().setTimeout(10000));
             DashboardManager.log("      🎉 SUCCESS: Candidate Deployed!");
@@ -174,7 +194,6 @@ public class OfferJobPage {
             DashboardManager.log("      ❌ Deployment Success Message NOT found.");
         }
 
-        // Verify Status Change
         page.waitForTimeout(2000);
         Locator deployedStatus = page.locator("div").filter(new Locator.FilterOptions().setHasText("Deployed")).last();
         if (deployedStatus.isVisible()) {

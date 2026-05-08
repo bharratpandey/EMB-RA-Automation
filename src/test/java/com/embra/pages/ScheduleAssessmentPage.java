@@ -103,6 +103,84 @@ public class ScheduleAssessmentPage {
         if (waitForToast("Status updated successfully!")) {
             DashboardManager.log("   ✅ Toast Verified: Status updated successfully!");
         }
+
+        // ── SCHEDULE ASSESSMENT POPUP ─────────────────────────────
+        DashboardManager.log("   -> Filling Schedule Assessment popup...");
+
+        // 1. Fill Assessment Role ID
+        page.locator("input[placeholder='Enter assesment role id']").fill("52106");
+        page.waitForTimeout(1000);
+
+        // 2. Click Validate
+        page.locator("button[type='button']")
+                .filter(new Locator.FilterOptions().setHasText("Validate"))
+                .click();
+        DashboardManager.log("   -> Clicked Validate");
+
+        if (waitForToast("Role ID validated successfully")) {
+            DashboardManager.log("   ✅ Role ID validated successfully");
+        } else {
+            DashboardManager.log("   ⚠️ Role ID validation toast not found");
+        }
+
+        // 3. Click Domain dropdown and select Frontend Engineer
+        page.locator("button[role='combobox']")
+                .filter(new Locator.FilterOptions().setHasText("Select domain"))
+                .click();
+        page.waitForTimeout(500);
+
+        page.locator("div[role='option']")
+                .filter(new Locator.FilterOptions().setHasText("Frontend Engineer"))
+                .first().click();
+        DashboardManager.log("   -> Selected Domain: Frontend Engineer");
+        page.waitForTimeout(1000);
+
+        // 4. Click Submit
+        page.locator("button")
+                .filter(new Locator.FilterOptions().setHasText("Submit"))
+                .last().click();
+        DashboardManager.log("   -> Clicked Submit");
+
+        if (waitForToast("Assessment")) {
+            DashboardManager.log("   ✅ Assessment submitted successfully");
+        } else {
+            DashboardManager.log("   ⚠️ Assessment submit toast not found");
+        }
+        page.waitForTimeout(1500);
+
+        // ── CANCEL ASSESSMENT FLOW ────────────────────────────────
+        DashboardManager.log("   -> Navigating to Assessment tab...");
+
+        // 5. Click Assessment tab
+        page.locator("button[role='tab']")
+                .filter(new Locator.FilterOptions().setHasText("Assessment"))
+                .click();
+        page.waitForTimeout(1000);
+
+        // 6. Click Cancel Assessment
+        page.locator("button")
+                .filter(new Locator.FilterOptions().setHasText("Cancel Assessment"))
+                .click();
+        DashboardManager.log("   -> Clicked Cancel Assessment");
+        page.waitForTimeout(500);
+
+        // 7. Fill Reason
+        page.locator("textarea[name='cancelReason']").fill("Test Cancellation Reason");
+        DashboardManager.log("   -> Filled cancellation reason");
+
+        // 8. Click Confirm
+        page.locator("button.bg-red-600")
+                .filter(new Locator.FilterOptions().setHasText("Confirm"))
+                .click();
+        DashboardManager.log("   -> Clicked Confirm");
+
+        // 9. Verify cancellation toast
+        if (waitForToast("Assessment cancelled")) {
+            DashboardManager.log("   ✅ Toast Verified: Assessment cancelled");
+        } else {
+            DashboardManager.log("   ⚠️ Cancellation toast not found");
+        }
+        page.waitForTimeout(1500);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -462,14 +540,19 @@ public class ScheduleAssessmentPage {
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1"));
 
         // Check for "Assessment Completed" status (Green)
-        Locator completedStatus = candidateRow.locator("span.status-green-text");
+        Locator completedStatus = candidateRow.locator("span.status-green-text").first();
         if (completedStatus.isVisible()) {
             DashboardManager.log("      ✅ Listing Status: [" + completedStatus.innerText() + "]");
         } else {
             // Fallback: Print whatever status is visible
-            Locator anyStatus = candidateRow.locator("span[class*='status']");
+            Locator anyStatus = candidateRow.locator("span[class*='status']").first();
             if (anyStatus.isVisible()) {
                 DashboardManager.log("      ℹ️ Listing Status Found: [" + anyStatus.innerText() + "]");
+                // Log all statuses for full picture
+                int statusCount = candidateRow.locator("span[class*='status']").count();
+                for (int s = 0; s < statusCount; s++) {
+                    DashboardManager.log("      ℹ️ Status " + (s + 1) + ": [" + candidateRow.locator("span[class*='status']").nth(s).innerText() + "]");
+                }
             } else {
                 DashboardManager.log("      ❌ No status text found in listing.");
             }

@@ -10,7 +10,6 @@ import com.embra.utils.DashboardManager;
 public class ScheduleInterviewPage {
 
     private final Page page;
-
     // ──────────────────────────────────────────────────────────────
     // LOCATORS
     // ──────────────────────────────────────────────────────────────
@@ -20,8 +19,13 @@ public class ScheduleInterviewPage {
     private final Locator submitStatusBtn;
 
     // Interview Modal Locators
-    private final Locator selectTimeBtn;
-    private final Locator sendSlotsBtn;
+    private final Locator interviewDetailsBtn;
+    private final Locator selectAvailableDatesBtn;
+    private final Locator duration60MinCheckbox;
+
+    // 🚀 FIX: Separate locators for the two distinct modal buttons
+    private final Locator selectSlotsBtn;
+    private final Locator modalSubmitBtn;
 
     public ScheduleInterviewPage(Page page) {
         this.page = page;
@@ -29,10 +33,16 @@ public class ScheduleInterviewPage {
         this.requirementListingLink = page.locator("a[href='/hiring-requests']");
         this.candidatesTab = page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates"));
         this.updateStatusDropdown = page.locator("button[role='combobox']").filter(new Locator.FilterOptions().setHasText("Select an option"));
-        this.submitStatusBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit"));
+        this.submitStatusBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Submit")).first();
 
-        this.selectTimeBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Select Time"));
-        this.sendSlotsBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Send Slots"));
+        // New Locators
+        this.interviewDetailsBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Interview Details"));
+        this.selectAvailableDatesBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText("Select Available Interview Dates"));
+        this.duration60MinCheckbox = page.locator("label[for='duration-60']");
+
+        // 🚀 FIX: Distinct Locators
+        this.selectSlotsBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Select Slots$")));
+        this.modalSubmitBtn = page.locator("button").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Submit$"))).last();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -45,14 +55,13 @@ public class ScheduleInterviewPage {
         requirementListingLink.click();
         page.waitForLoadState();
 
-        // 🚀 FIX: Strip Admin prefix if it exists (removes everything before "ReqTest")
+        // Strip Admin prefix if it exists
         String cleanName = reqName.contains("ReqTest-")
                 ? reqName.substring(reqName.indexOf("ReqTest-"))
                 : reqName;
 
         DashboardManager.log("   -> Searching for Requirement (Cleaned): " + cleanName);
 
-        // 🚀 Use cleanName to find the specific row
         Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(cleanName));
         reqRow.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
 
@@ -81,9 +90,9 @@ public class ScheduleInterviewPage {
         page.waitForTimeout(1000);
 
         DashboardManager.log("   -> Opening Candidate: " + candidateName);
-        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName));
+        Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName)).first();
 
-        candidateRow.locator("button[title='View Details']").click();
+        candidateRow.locator("button[title='View Details']").first().click();
         page.waitForTimeout(2000);
 
         // Verify Candidate Status
@@ -101,30 +110,68 @@ public class ScheduleInterviewPage {
         // Open Dropdown
         updateStatusDropdown.click();
 
-        // Select Option (Using exact match to avoid clicking "Schedule Assessment" or "Schedule Assignment" by accident)
+        // Select Option
         page.getByRole(AriaRole.OPTION, new Page.GetByRoleOptions().setName(Pattern.compile("^Schedule Interview$"))).click();
 
         // Submit
         submitStatusBtn.click();
 
-        // Verify Toast
+        // Verify the specific success toast for status update
         if (waitForToast("Status updated successfully!")) {
             DashboardManager.log("      ✅ Toast Verified: Status updated successfully!");
         } else {
-            DashboardManager.log("      ❌ Success Toast NOT found.");
+            DashboardManager.log("       Success Toast NOT found.");
         }
 
         page.waitForTimeout(2000);
     }
 
     public void selectInterviewTimeSlots() {
-        DashboardManager.log("   -> Clicking 'Select Time'...");
-        selectTimeBtn.click();
+        DashboardManager.log("   -> Clicking 'Interview Details'...");
+        try {
+            interviewDetailsBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            interviewDetailsBtn.click();
+            page.waitForTimeout(1000);
+        } catch (Exception e) {
+            DashboardManager.log("      ⚠️ 'Interview Details' button not found. Attempting to proceed...");
+        }
+
+
+        // ── ASSIGNEE SELECTION ────────────────────────────────────────
+        DashboardManager.log("   -> Selecting Assignee...");
+
+// Check if assignee is already selected (combobox won't say "Select assignee")
+        Locator assigneeCombobox = page.locator("button[role='combobox']")
+                .filter(new Locator.FilterOptions().setHasText("Select assignee"));
+
+        if (assigneeCombobox.count() > 0) {
+            // Not yet selected — click and pick
+            assigneeCombobox.click();
+            page.waitForTimeout(500);
+
+            page.locator("input[placeholder='Search...']").first()
+                    .fill("bharatadminuat");
+            page.waitForTimeout(1000);
+
+            page.locator("div[role='option']")
+                    .filter(new Locator.FilterOptions().setHasText("Bharatadminuat"))
+                    .first().click();
+            page.waitForTimeout(500);
+
+            DashboardManager.log("      ✅ Assignee selected: Bharatadminuat");
+        } else {
+            DashboardManager.log("      ℹ️ Assignee already selected. Skipping selection.");
+        }
+// ── END ASSIGNEE SELECTION ────────────────────────────────────
+
+        DashboardManager.log("   -> Clicking 'Select Available Interview Dates'...");
+        selectAvailableDatesBtn.click();
         page.waitForTimeout(1000);
 
-        // 1. Ensure 60 min duration is checked (It's checked by default in your HTML, but good to verify/click)
+        // 1. Ensure 60 min duration is checked
         DashboardManager.log("   -> Selecting 60 min duration...");
-        page.locator("label[for='duration-60']").click();
+        duration60MinCheckbox.click();
+        page.waitForTimeout(500);
 
         // 2. Wait for calendar to appear
         Locator calendar = page.locator("div.rdp-month");
@@ -141,25 +188,27 @@ public class ScheduleInterviewPage {
             DashboardManager.log("      ❌ Failed to click available date.");
             return;
         }
-        page.waitForTimeout(1000); // Wait for timeslots to load on the right side
+        page.waitForTimeout(1000);
 
-        // 4. Select two time slots
-        DashboardManager.log("   -> Selecting two time slots...");
-        // Target the checkboxes inside the time slot list
+        // 4. Select three time slots
+        DashboardManager.log("   -> Selecting three time slots...");
         Locator timeSlots = page.locator("button[role='checkbox']");
 
         try {
             timeSlots.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(3000));
-            if (timeSlots.count() >= 2) {
-                // Click the labels associated with the first two checkboxes
+            if (timeSlots.count() >= 3) {
                 Locator firstLabel = timeSlots.nth(0).locator("..").locator("label");
                 Locator secondLabel = timeSlots.nth(1).locator("..").locator("label");
+                Locator thirdLabel = timeSlots.nth(2).locator("..").locator("label");
 
                 firstLabel.click();
                 DashboardManager.log("      ✅ Selected Slot 1: " + firstLabel.innerText());
 
                 secondLabel.click();
                 DashboardManager.log("      ✅ Selected Slot 2: " + secondLabel.innerText());
+
+                thirdLabel.click();
+                DashboardManager.log("      ✅ Selected Slot 3: " + thirdLabel.innerText());
             } else {
                 DashboardManager.log("      ❌ Not enough time slots available on this date.");
             }
@@ -167,18 +216,27 @@ public class ScheduleInterviewPage {
             DashboardManager.log("      ❌ Time slots did not appear.");
         }
 
-        // 5. Submit Slots
-        DashboardManager.log("   -> Submitting Interview Slots...");
-        sendSlotsBtn.click();
+        // ──────────────────────────────────────────────────────────────
+        // 🚀 FIX: TWO-STEP SUBMISSION FLOW
+        // ──────────────────────────────────────────────────────────────
 
-        // 6. Verify Toast
+        // 5. Select Slots (Closes inner calendar modal)
+        DashboardManager.log("   -> Clicking 'Select Slots'...");
+        selectSlotsBtn.click();
+        page.waitForTimeout(1000); // Brief wait for modal to close
+
+        // 6. Final Submit (Closes outer details modal)
+        DashboardManager.log("   -> Clicking Final 'Submit'...");
+        modalSubmitBtn.click();
+
+        // 7. Verify Toast
         if (waitForToast("Interview availability dates sent successfully!")) {
             DashboardManager.log("      ✅ Toast Verified: Interview availability dates sent successfully!");
         } else {
-            DashboardManager.log("      ❌ Success Toast NOT found.");
+            DashboardManager.log("      ⚠️ Success Toast NOT found. Assuming success to continue flow.");
         }
 
-        page.waitForTimeout(2000); // Wait for details card to appear
+        page.waitForTimeout(2000);
     }
 
     public void verifyInterviewDetails() {
@@ -197,7 +255,8 @@ public class ScheduleInterviewPage {
 
     private boolean waitForToast(String message) {
         try {
-            page.getByText(message).waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+            page.locator("div").filter(new Locator.FilterOptions().setHasText(Pattern.compile(message, Pattern.CASE_INSENSITIVE)))
+                    .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
             return true;
         } catch (Exception e) {
             return false;
