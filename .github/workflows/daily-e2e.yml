@@ -2,8 +2,11 @@ name: Daily E2E — ScheduleInterviewAssignmentAssessmentTest
 
 on:
   schedule:
-    - cron: '30 3 * * *'   # 9:00 AM IST = 3:30 AM UTC
-  workflow_dispatch:         # Manual trigger from GitHub UI anytime
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   run-e2e:
@@ -18,10 +21,18 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: maven          # ← caches Maven dependencies — fast after first run
+          cache: maven
+
+      - name: Install system dependencies for Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+            libxfixes3 libxrandr2 libgbm1 libasound2t64
 
       - name: Install Playwright Chromium
-        run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium --with-deps"
+        run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
 
       - name: Run Test
         run: mvn test -Dtest=ScheduleInterviewAssignmentAssessmentTest --no-transfer-progress
