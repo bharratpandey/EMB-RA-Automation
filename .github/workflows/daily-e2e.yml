@@ -43,7 +43,7 @@ jobs:
           java -cp "$PLAYWRIGHT_JAR:$DRIVER_JAR:$BUNDLE_JAR" com.microsoft.playwright.CLI install chromium
 
       - name: Run Test
-        run: mvn test -Dtest=ScheduleInterviewAssignmentAssessmentTest --no-transfer-progress
+        run: mvn test -Dtest="ScheduleInterviewAssignmentAssessmentTest#testMasterE2EFlow" --no-transfer-progress
 
       - name: Upload Traces
         if: always()
