@@ -41,7 +41,7 @@ public class EmailSender {
             Message message = new MimeMessage(session);
             message.setFrom(new InternetAddress(fromEmail));
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
-            message.setSubject("🚀 EMB Automation: Daily Execution Report");
+            message.setSubject("🚀 EMB-RA Automation: Daily Execution Report");
 
             int passed = DashboardManager.getPassCount();
             int failed = DashboardManager.getFailCount();
@@ -73,7 +73,7 @@ public class EmailSender {
     </head>
     <body>
         <div class="container">
-            <div class="header"><h2>Automation Report</h2></div>
+            <div class="header"><h2>EMB-RA Automation Report</h2></div>
             <div class="content">
                 <p>Hello Team,</p>
                 <div class="status-banner">%s</div>

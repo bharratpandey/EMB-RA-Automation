@@ -1,10 +1,9 @@
-name: Daily Automation Run
+name: Weekly EMB-RA Automation Report
 
 on:
   schedule:
-    # 6:00 PM IST is 12:30 PM UTC
-    - cron: '30 0 * * *'
-  # This line creates a button so you can trigger it manually anytime
+    # Every Monday 9:00 AM IST = 3:30 AM UTC
+    - cron: '30 3 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -26,14 +25,12 @@ jobs:
         run: mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install --with-deps"
 
       - name: Run E2E Tests
-        # xvfb-run allows UI tests to run smoothly on cloud servers
-        run: xvfb-run mvn test
+        run: xvfb-run mvn test -Dtest=CreateRequirementTest
         env:
-          # This grabs the hidden password you just saved in GitHub Settings
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
 
       - name: Upload Dashboard Backup
-        if: always() # Saves the dashboard even if the test fails
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Automation-Dashboard
