@@ -172,6 +172,8 @@ public class OfferJobPage {
             DashboardManager.log("      ❌ File upload failed: " + e.getMessage());
         }
 
+        page.waitForTimeout(3000);
+
         // 5. Click Deploy if enabled
         DashboardManager.log("   -> Checking Deploy button state...");
         Locator deployBtn = page.locator("button.bg-green-600").filter(new Locator.FilterOptions().setHasText("Deploy"));
