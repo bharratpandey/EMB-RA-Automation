@@ -785,7 +785,7 @@ public class CreateRequirementTest {
         DashboardManager.flushReport();
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
-        EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
-        EmailSender.sendDashboardEmail("saumya.gupta@emb.global");
+        //EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
+        //EmailSender.sendDashboardEmail("saumya.gupta@emb.global");
     }
 }
