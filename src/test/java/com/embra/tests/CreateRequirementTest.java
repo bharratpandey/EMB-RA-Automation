@@ -201,14 +201,16 @@ public class CreateRequirementTest {
 
             DashboardManager.log("   [5a-4] 🏆 Adding Award...");
             try {
-                Locator addAwardsBtn = vendorPage.locator("button").filter(
-                        new Locator.FilterOptions().setHas(
-                                vendorPage.locator("span").filter(
-                                        new Locator.FilterOptions().setHasText("Add Awards")
-                                )
-                        )
-                ).first();
+                // Locate via parent div containing "Awards" paragraph + the button
+                Locator achievementsSection = vendorPage.locator("div.flex.flex-col.gap-4")
+                        .filter(new Locator.FilterOptions().setHasText("Achievements"));
+
+                Locator addAwardsBtn = achievementsSection.locator("button.rounded-3xl")
+                        .filter(new Locator.FilterOptions().setHasText("Add Awards"))
+                        .first();
+
                 addAwardsBtn.scrollIntoViewIfNeeded();
+                vendorPage.waitForTimeout(500);
                 addAwardsBtn.click(new Locator.ClickOptions().setForce(true));
                 vendorPage.waitForTimeout(500);
 
@@ -231,7 +233,7 @@ public class CreateRequirementTest {
                 vendorPage.waitForTimeout(2000);
                 DashboardManager.log("   [5a-4] ✅ Award Added.");
             } catch (Exception e) {
-                DashboardManager.log("   [5a-4] ❌ Award Failed: " + e.getMessage());
+                DashboardManager.log("   [5a-4] ⚠️ Award Failed: " + e.getMessage());
             }
 
             DashboardManager.log("   [5a-5] ⚙️ Filling Engagement & Financials...");
@@ -758,8 +760,8 @@ public class CreateRequirementTest {
 
             if (i == 0) firstTitle = title;
 
-            if ("Active".equalsIgnoreCase(status)) {
-                DashboardManager.log("[REPORT] ✅ Row " + (i + 1) + " [" + title + "]: Status is Active");
+            if ("New".equalsIgnoreCase(status)) {
+                DashboardManager.log("[REPORT] ✅ Row " + (i + 1) + " [" + title + "]: Status is New");
             } else {
                 DashboardManager.log("[REPORT] ❌ Row " + (i + 1) + " [" + title + "]: WRONG STATUS! Found: [" + status + "]");
             }

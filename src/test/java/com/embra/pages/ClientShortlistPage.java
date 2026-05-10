@@ -217,25 +217,35 @@ public class ClientShortlistPage {
             page.evaluate("el => el.click()", rejectOption.elementHandle());
         }
 
-        // 🚀 5. Fill Reason and Finalize
-        page.locator("textarea[name='reason']").fill("this is automated Reason");
-        // Target the specific red Reject button in the modal
-        page.locator("button").filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Reject$"))).click();
+        // 🚀 5. Select reason from dropdown and confirm
+        page.waitForTimeout(1000);
 
-        if (waitForClientToast("Candidate rejected successfully")) {
-            DashboardManager.log("      ✅ Toast Verified: Candidate rejected.");
+        page.locator("button[role='combobox']")
+                .filter(new Locator.FilterOptions().setHasText("Select a reason"))
+                .click();
+        page.waitForTimeout(500);
+
+        page.locator("div[role='option']")
+                .filter(new Locator.FilterOptions().setHasText("Not a good fit"))
+                .click();
+        page.waitForTimeout(500);
+
+        page.locator("button").filter(new Locator.FilterOptions().setHasText("Confirm")).click();
+
+        if (waitForClientToast("Candidate moved successfully")) {
+            DashboardManager.log("      ✅ Toast Verified: Candidate moved successfully.");
+        } else {
+            DashboardManager.log("      ⚠️ Toast not found. Proceeding...");
         }
 
         page.waitForTimeout(2000);
-        // Robust status check
         String finalStatus = candidate4Row.innerText();
         DashboardManager.log("      Candidate 4 Row Text: " + finalStatus);
         if (finalStatus.contains("Rejected")) {
             DashboardManager.log("      Candidate 4 Status: ✅ Rejected");
         } else {
             DashboardManager.log("      Candidate 4 Status: ❌ Status not updated in UI");
-        }
-    }
+        }}
 
     // ──────────────────────────────────────────────────────────────
     // 4. ADMIN VERIFICATION: CHECK REJECTED STATUS

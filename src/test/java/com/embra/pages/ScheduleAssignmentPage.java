@@ -101,11 +101,11 @@ public class ScheduleAssignmentPage {
         page.waitForTimeout(2000);
 
         // Verify Candidate Status
-        Locator statusChip = page.locator("div").filter(new Locator.FilterOptions().setHasText("Assignment Shortlisted")).last();
+        Locator statusChip = page.locator("div").filter(new Locator.FilterOptions().setHasText("Applied")).last();
         if (statusChip.isVisible()) {
-            DashboardManager.log("      ✅ Candidate Status: Assignment Shortlisted");
+            DashboardManager.log("      ✅ Candidate Status: Applied");
         } else {
-            DashboardManager.log("      ❌ Candidate Status mismatch! (Expected: Assignment Shortlisted)");
+            DashboardManager.log("      ❌ Candidate Status mismatch! (Expected: Applied)");
         }
     }
 

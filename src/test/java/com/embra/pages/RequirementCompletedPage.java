@@ -99,7 +99,8 @@ public class RequirementCompletedPage {
         // 3. Costs
         DashboardManager.log("   -> Filling Financial Details...");
         page.locator("input[name='client_cost']").fill("1200000");
-        page.locator("input[name='cost']").fill("900000");
+        page.locator("input[name='client_commission']").fill("10");
+        page.locator("input[name='partner_commission']").fill("10");
 
         // 4. Upload
         DashboardManager.log("   -> Uploading Documents...");

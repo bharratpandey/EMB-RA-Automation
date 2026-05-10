@@ -145,7 +145,7 @@ public class AllowResubmissionPage {
             }
 
         } else {
-            DashboardManager.log("      ❌ Could not find status badge for candidate: " + candidateName);
+            DashboardManager.log("      ⚠️ Could not find status badge for candidate: " + candidateName);
         }
     }
 

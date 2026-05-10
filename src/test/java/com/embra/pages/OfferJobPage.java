@@ -165,8 +165,7 @@ public class OfferJobPage {
         // 4. Upload Document
         DashboardManager.log("   -> Uploading Documents...");
         try {
-            page.locator("label[for='deploy-docs']").scrollIntoViewIfNeeded();
-            page.locator("input[type='file']").setInputFiles(Paths.get(filePath));
+            page.locator("input[type='file']").first().setInputFiles(Paths.get(filePath));
             page.waitForTimeout(1500);
             DashboardManager.log("      ✅ Document Uploaded.");
         } catch (Exception e) {
