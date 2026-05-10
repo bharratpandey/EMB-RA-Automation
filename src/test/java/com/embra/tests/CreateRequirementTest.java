@@ -37,7 +37,7 @@ public class CreateRequirementTest {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setChannel("chrome")
-                .setHeadless(true)
+                .setHeadless(false)
         );
     }
 
@@ -199,41 +199,31 @@ public class CreateRequirementTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   [5a-3] ✅ Basic Info Filled.");
 
-            DashboardManager.log("   [5a-4] 🏆 Adding Award...");
+            DashboardManager.log("   [5a-4] 📜 Adding Certificate...");
             try {
-                // Locate via parent div containing "Awards" paragraph + the button
-                Locator achievementsSection = vendorPage.locator("div.flex.flex-col.gap-4")
-                        .filter(new Locator.FilterOptions().setHasText("Achievements"));
-
-                Locator addAwardsBtn = achievementsSection.locator("button.rounded-3xl")
-                        .filter(new Locator.FilterOptions().setHasText("Add Awards"))
+                Locator addCertBtn = vendorPage.locator("button.rounded-3xl")
+                        .filter(new Locator.FilterOptions().setHasText("Add Certificates"))
                         .first();
-
-                addAwardsBtn.scrollIntoViewIfNeeded();
+                addCertBtn.scrollIntoViewIfNeeded();
                 vendorPage.waitForTimeout(500);
-                addAwardsBtn.click(new Locator.ClickOptions().setForce(true));
-                vendorPage.waitForTimeout(500);
-
-                vendorPage.locator("input[name='nameOfAward']").clear();
-                vendorPage.locator("input[name='nameOfAward']").fill("EOY");
-
-                vendorPage.locator("button[role='combobox']")
-                        .filter(new Locator.FilterOptions().setHasText("Select year")).click();
-                vendorPage.waitForTimeout(500);
-                vendorPage.locator("div[role='option']")
-                        .filter(new Locator.FilterOptions().setHasText("2024")).click();
+                addCertBtn.click(new Locator.ClickOptions().setForce(true));
                 vendorPage.waitForTimeout(500);
 
-                vendorPage.locator("textarea[name='description']").first().clear();
-                vendorPage.locator("textarea[name='description']").first()
-                        .fill("this is the Automated Description box");
+                vendorPage.locator("input[name='nameOfCertificate']").fill("Java EE");
+                vendorPage.locator("input[name='certificateId']").fill("GOOGLE JAVA 013");
+                vendorPage.locator("input[name='issued_date']").fill("2024-12-12");
+                vendorPage.locator("textarea[name='description']").first().fill("this is automated description");
+
+                vendorPage.locator("input[type='file'][accept='.pdf,.doc,.docx']")
+                        .setInputFiles(Paths.get(JD_FILE_PATH));
+                vendorPage.waitForTimeout(1000);
 
                 vendorPage.locator("button[type='submit']")
-                        .filter(new Locator.FilterOptions().setHasText("Save Award")).click();
+                        .filter(new Locator.FilterOptions().setHasText("Save Certificate")).click();
                 vendorPage.waitForTimeout(2000);
-                DashboardManager.log("   [5a-4] ✅ Award Added.");
+                DashboardManager.log("   [5a-4] ✅ Certificate Added.");
             } catch (Exception e) {
-                DashboardManager.log("   [5a-4] ⚠️ Award Failed: " + e.getMessage());
+                DashboardManager.log("   [5a-4] ❌ Certificate Failed: " + e.getMessage());
             }
 
             DashboardManager.log("   [5a-5] ⚙️ Filling Engagement & Financials...");
