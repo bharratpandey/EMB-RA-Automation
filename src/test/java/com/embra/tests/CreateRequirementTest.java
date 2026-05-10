@@ -24,7 +24,7 @@ public class CreateRequirementTest {
     private BrowserContext context;
     private Page page;
 
-    private static final String JD_FILE_PATH = "src/test/resources/Ajay_Gupta_resume_.pdf";
+    private static final String JD_FILE_PATH = "src/test/resources/Anurag_DesignResume (2).pdf";
 
     @BeforeAll
     static void setupBrowser() throws IOException {
@@ -199,31 +199,35 @@ public class CreateRequirementTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   [5a-3] ✅ Basic Info Filled.");
 
-            DashboardManager.log("   [5a-4] 📜 Adding Certificate...");
+            DashboardManager.log("   [5a-4] 🏆 Adding Award...");
             try {
-                Locator addCertBtn = vendorPage.locator("button.rounded-3xl")
-                        .filter(new Locator.FilterOptions().setHasText("Add Certificates"))
+                // Locate via parent div containing "Awards" paragraph + the button
+                Locator achievementsSection = vendorPage.locator("div.flex.flex-col.gap-4")
+                        .filter(new Locator.FilterOptions().setHasText("Achievements"));
+                Locator addAwardsBtn = achievementsSection.locator("button.rounded-3xl")
+                        .filter(new Locator.FilterOptions().setHasText("Add Awards"))
                         .first();
-                addCertBtn.scrollIntoViewIfNeeded();
+                addAwardsBtn.scrollIntoViewIfNeeded();
                 vendorPage.waitForTimeout(500);
-                addCertBtn.click(new Locator.ClickOptions().setForce(true));
+                addAwardsBtn.click(new Locator.ClickOptions().setForce(true));
                 vendorPage.waitForTimeout(500);
-
-                vendorPage.locator("input[name='nameOfCertificate']").fill("Java EE");
-                vendorPage.locator("input[name='certificateId']").fill("GOOGLE JAVA 013");
-                vendorPage.locator("input[name='issued_date']").fill("2024-12-12");
-                vendorPage.locator("textarea[name='description']").first().fill("this is automated description");
-
-                vendorPage.locator("input[type='file'][accept='.pdf,.doc,.docx']")
-                        .setInputFiles(Paths.get(JD_FILE_PATH));
-                vendorPage.waitForTimeout(1000);
-
+                vendorPage.locator("input[name='nameOfAward']").clear();
+                vendorPage.locator("input[name='nameOfAward']").fill("EOY");
+                vendorPage.locator("button[role='combobox']")
+                        .filter(new Locator.FilterOptions().setHasText("Select year")).click();
+                vendorPage.waitForTimeout(500);
+                vendorPage.locator("div[role='option']")
+                        .filter(new Locator.FilterOptions().setHasText("2024")).click();
+                vendorPage.waitForTimeout(500);
+                vendorPage.locator("textarea[name='description']").first().clear();
+                vendorPage.locator("textarea[name='description']").first()
+                        .fill("this is the Automated Description box");
                 vendorPage.locator("button[type='submit']")
-                        .filter(new Locator.FilterOptions().setHasText("Save Certificate")).click();
+                        .filter(new Locator.FilterOptions().setHasText("Save Award")).click();
                 vendorPage.waitForTimeout(2000);
-                DashboardManager.log("   [5a-4] ✅ Certificate Added.");
+                DashboardManager.log("   [5a-4] ✅ Award Added.");
             } catch (Exception e) {
-                DashboardManager.log("   [5a-4] ❌ Certificate Failed: " + e.getMessage());
+                DashboardManager.log("   [5a-4] ⚠️ Award Failed: " + e.getMessage());
             }
 
             DashboardManager.log("   [5a-5] ⚙️ Filling Engagement & Financials...");
@@ -781,5 +785,7 @@ public class CreateRequirementTest {
         DashboardManager.flushReport();
         EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
         EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
+        EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
+        EmailSender.sendDashboardEmail("saumya.gupta@emb.global");
     }
 }

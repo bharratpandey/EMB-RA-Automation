@@ -27,11 +27,21 @@ public class ClientShortlistPage {
         page.waitForTimeout(3000);
 
         // 🚀 Close Tutorial Tour if present
-        Locator closeTourBtn = page.locator("button[aria-label='Close tour']");
-        if (closeTourBtn.isVisible()) {
+        try {
+            Locator tourOverlay = page.locator("div.fixed.inset-0.z-\\[9999\\]");
+            tourOverlay.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
             DashboardManager.log("   -> Closing tutorial tour...");
-            closeTourBtn.click();
-            page.waitForTimeout(500);
+            // Click the close button inside the tour popup
+            page.locator("button[aria-label='Close tour']").first().click();
+            page.waitForTimeout(1000);
+            // If overlay still visible, force remove via JS
+            if (tourOverlay.isVisible()) {
+                page.evaluate("document.querySelector('div.fixed.inset-0.z-\\\\[9999\\\\]') && document.querySelector('div.fixed.inset-0').remove()");
+                page.waitForTimeout(500);
+            }
+        } catch (Exception e) {
+            DashboardManager.log("   -> No tour overlay found, proceeding.");
         }
 
         // Use first() to target Sidebar 'Jobs' and avoid strict mode violation with Breadcrumbs
