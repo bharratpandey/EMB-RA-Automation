@@ -689,8 +689,8 @@ public class ScheduleInterviewAssignmentAssessmentTest {
                 "🚀 EMB Automation: Daily E2E Execution Report",
                 "bharatpandey011@gmail.com",
                 "bharat.pandey@emb.global",
-                //"Ashish.mishra@emb.global",
-                //"prakash@emb.global",
+                "Ashish.mishra@emb.global",
+                "prakash@emb.global",
                 "saumya.gupta@emb.global"
         );
     }
