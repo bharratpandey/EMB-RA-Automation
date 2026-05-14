@@ -595,7 +595,7 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
         page.waitForTimeout(1000);
 
-        adminAssessment.openCandidateAndVerify("Candidate 1", "bharat pvt ltd");
+        adminAssessment.openCandidateAndVerify("Candidate 1", "Vendor AED");
         adminAssessment.adminUpdateStatusToAssessment();
 
         stopAdminTrace("assessment-schedule-cancel");
@@ -685,10 +685,13 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         if (playwright != null) playwright.close();
 
         DashboardManager.flushReport();
-        EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
-        EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
-        EmailSender.sendDashboardEmail("Ashish.mishra@emb.global");
-        EmailSender.sendDashboardEmail("prakash@emb.global");
-        EmailSender.sendDashboardEmail("saumya.gupta@emb.global");
+        EmailSender.sendDashboardEmail(
+                "🚀 EMB Automation: Daily E2E Execution Report",
+                "bharatpandey011@gmail.com",
+                "bharat.pandey@emb.global",
+                //"Ashish.mishra@emb.global",
+                //"prakash@emb.global",
+                "saumya.gupta@emb.global"
+        );
     }
 }

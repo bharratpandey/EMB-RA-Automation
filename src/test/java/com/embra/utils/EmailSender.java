@@ -12,15 +12,13 @@ import java.util.Properties;
 
 public class EmailSender {
 
-    public static void sendDashboardEmail(String toEmail) {
+    public static void sendDashboardEmail(String subject, String... toEmails) {
         System.out.println("\n📧 Preparing to send Beautiful HTML Dashboard via Email...");
 
         final String fromEmail = "bharat.pandeyltd@gmail.com";
         String envPassword = System.getenv("EMAIL_PASSWORD");
-        final String appPassword = (envPassword == null || envPassword.isEmpty()) ? "vbrxoolyucgujwer" : envPassword;
+        final String appPassword = (envPassword == null || envPassword.isEmpty()) ? "joolfzckxmlguwnl" : envPassword;
 
-        // --- DYNAMIC TIME CALCULATION ---
-        // Captures current time and converts it specifically to India Standard Time
         String istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"))
                 .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a 'IST'"));
 
@@ -40,12 +38,12 @@ public class EmailSender {
         try {
             Message message = new MimeMessage(session);
             message.setFrom(new InternetAddress(fromEmail));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
-            message.setSubject("🚀 EMB-RA Automation: Daily Execution Report");
+            message.setRecipients(Message.RecipientType.TO,
+                    InternetAddress.parse(String.join(",", toEmails)));
+            message.setSubject(subject);
 
             int passed = DashboardManager.getPassCount();
             int failed = DashboardManager.getFailCount();
-            int total = passed + failed + DashboardManager.getInfoCount();
 
             String statusBanner = (failed > 0) ? "⚠️ Execution Completed with Failures" : "✅ Execution Completed Successfully";
             String bannerColor = (failed > 0) ? "#f8d7da" : "#e8f5e9";
@@ -73,11 +71,10 @@ public class EmailSender {
     </head>
     <body>
         <div class="container">
-            <div class="header"><h2>EMB-RA Automation Report</h2></div>
+            <div class="header"><h2>Weekly EMB-RA Automation Report</h2></div>
             <div class="content">
                 <p>Hello Team,</p>
                 <div class="status-banner">%s</div>
-                
                 <div class="stats-container">
                     <div class="stat-box">
                         <span class="stat-number" style="color: #28a745;">%d</span>
@@ -88,7 +85,6 @@ public class EmailSender {
                         <span class="stat-label">Failed</span>
                     </div>
                 </div>
-
                 <table class="details-table">
                     <tr><th>Environment</th><td>UAT</td></tr>
                     <tr><th>Execution Time</th><td>%s</td></tr>
@@ -99,33 +95,28 @@ public class EmailSender {
         </div>
     </body>
     </html>
-    """.formatted(
-                    bannerColor, textColor,          // status-banner style
-                    statusBanner,                     // banner text
-                    passed, failed,                   // stats (only Passed & Failed)
-                    istTime                           // dynamic IST time
-            );
+    """.formatted(bannerColor, textColor, statusBanner, passed, failed, istTime);
 
             BodyPart messageBodyPart = new MimeBodyPart();
             messageBodyPart.setContent(htmlBody, "text/html; charset=utf-8");
 
             BodyPart attachmentPart = new MimeBodyPart();
             File file = new File(DashboardManager.REPORT_PATH);
-            if(file.exists()) {
+            if (file.exists()) {
                 attachmentPart.setDataHandler(new DataHandler(new FileDataSource(file)));
                 attachmentPart.setFileName("Detailed_Automation_Dashboard.html");
             }
 
             Multipart multipart = new MimeMultipart();
             multipart.addBodyPart(messageBodyPart);
-            if(file.exists()) multipart.addBodyPart(attachmentPart);
+            if (file.exists()) multipart.addBodyPart(attachmentPart);
 
             message.setContent(multipart);
             Transport.send(message);
-            System.out.println("✅ Detailed HTML Email sent with dynamic time: " + istTime);
+            System.out.println("✅ Detailed HTML Email sent to " + toEmails.length + " recipients at: " + istTime);
 
         } catch (MessagingException e) {
-            e.printStackTrace();
+            System.err.println("❌ Email sending failed: " + e.getMessage());
         }
     }
 }

@@ -235,7 +235,7 @@ public class ScheduleAssessmentTest {
                 .filter(new Locator.FilterOptions().setHasText("Candidates")).click();
         page.waitForTimeout(1000);
 
-        adminSchedule.openCandidateAndVerify("Candidate 1", "bharat pvt ltd");
+        adminSchedule.openCandidateAndVerify("Candidate 1", "Vendor AED");
         adminSchedule.adminUpdateStatusToAssessment();
 
         // ⭐ TRACE: Stop Admin Schedule Assessment Trace

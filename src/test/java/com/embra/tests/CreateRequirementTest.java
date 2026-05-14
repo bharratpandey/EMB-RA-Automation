@@ -783,10 +783,11 @@ public class CreateRequirementTest {
         if (playwright != null) playwright.close();
 
         DashboardManager.flushReport();
-        EmailSender.sendDashboardEmail("bharatpandey011@gmail.com");
-        EmailSender.sendDashboardEmail("bharat.pandey@emb.global");
-        EmailSender.sendDashboardEmail("ashish.mishra@emb.global");
-        EmailSender.sendDashboardEmail("saumya.gupta@emb.global");
-        EmailSender.sendDashboardEmail("prakash@emb.global");
+        EmailSender.sendDashboardEmail(
+                "🚀 EMB Automation: Weekly E2E Execution Report",
+                "bharatpandey011@gmail.com",
+                "bharat.pandey@emb.global",
+                "saumya.gupta@emb.global"
+        );
     }
 }
