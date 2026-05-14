@@ -17,7 +17,7 @@ public class EmailSender {
 
         final String fromEmail = "bharat.pandeyltd@gmail.com";
         String envPassword = System.getenv("EMAIL_PASSWORD");
-        final String appPassword = (envPassword == null || envPassword.isEmpty()) ? "joolfzckxmlguwnl" : envPassword;
+        final String appPassword = (envPassword == null || envPassword.isEmpty()) ? "scmeixcohwigvtcr" : envPassword;
 
         String istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"))
                 .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a 'IST'"));
