@@ -104,9 +104,9 @@ public class ReportGenerationCheckTest {
         if (playwright != null) playwright.close();
 
         EmailSender.sendDashboardEmail(
-                "🚀 EMB Automation: Report Generation Check",
+                "REPORT GENERATION CHECK DAILY",
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global","saumya.gupta@emb.global"
+                "bharat.pandey@emb.global","saumya.gupta@emb.global,gaurav.rauthan@emb.global,prakash@emb.global"
         );
     }
 }
