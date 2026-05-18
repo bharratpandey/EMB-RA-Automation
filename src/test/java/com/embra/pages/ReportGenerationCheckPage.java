@@ -110,11 +110,14 @@ public class ReportGenerationCheckPage {
 
     // ──────────────────────────────────────────────────────────────
     // 5. OPEN GMAIL & WAIT FOR REPORT EMAIL
+    // Returns the download link found inside the email body
     // ──────────────────────────────────────────────────────────────
 
-    public void openGmailAndVerifyReportEmail(Page gmailPage, String reportClickTime) {
+    public String openGmailAndVerifyReportEmail(Page gmailPage, String reportClickTime) {
         DashboardManager.log("\n--- 📧 OPENING GMAIL TO VERIFY REPORT EMAIL ---");
         DashboardManager.log("   -> Report was requested at: " + reportClickTime);
+
+        String downloadLink = "Not found";
 
         gmailPage.bringToFront();
         gmailPage.navigate("https://mail.google.com");
@@ -142,6 +145,7 @@ public class ReportGenerationCheckPage {
             gmailPage.reload();
             gmailPage.waitForTimeout(3000);
 
+            // Find emails from Team EMBTalent with report subject
             Locator emailRows = gmailPage.locator("tr.zA")
                     .filter(new Locator.FilterOptions().setHasText("Team EMBTalent"))
                     .filter(new Locator.FilterOptions().setHasText("EMBTalent: Your Requested Report"));
@@ -160,8 +164,8 @@ public class ReportGenerationCheckPage {
                     if (titleAttr != null && clickMinutes >= 0) {
                         // Extract time from "Thu, May 14, 2026, 4:07 PM"
                         String timePart = titleAttr.substring(titleAttr.lastIndexOf(", ") + 2)
-                                .replaceAll("[^0-9:AaPpMm ]", "")  // remove all non-time characters
-                                .replaceAll("\\s+", " ")            // normalize spaces
+                                .replaceAll("[^0-9:AaPpMm ]", "")
+                                .replaceAll("\\s+", " ")
                                 .trim();
                         DashboardManager.log("   -> Email received at: " + timePart);
 
@@ -196,15 +200,34 @@ public class ReportGenerationCheckPage {
                 gmailPage.waitForTimeout(2000);
                 DashboardManager.log("   ✅ Email opened.");
 
+                // Verify content and extract download link
                 try {
                     String body = gmailPage.locator("div.a3s").first().innerText().trim();
                     DashboardManager.log("   -> Email body preview: "
                             + body.substring(0, Math.min(200, body.length())));
+
                     if (body.contains("Your Requested Report") || body.contains("Download Report")) {
                         DashboardManager.log("   ✅ Email content verified — Download Report link present.");
                     } else {
                         DashboardManager.log("   ❌ Email content mismatch.");
                     }
+
+                    // Extract download link from anchor tag inside email body
+                    try {
+                        Locator linkLocator = gmailPage.locator("div.a3s a")
+                                .filter(new Locator.FilterOptions().setHasText("Download Report"))
+                                .first();
+                        downloadLink = linkLocator.getAttribute("href");
+                        if (downloadLink != null && !downloadLink.isEmpty()) {
+                            DashboardManager.log("   ✅ Download link extracted: " + downloadLink);
+                        } else {
+                            DashboardManager.log("   ⚠️ Download link href is empty.");
+                            downloadLink = "Not found";
+                        }
+                    } catch (Exception ex) {
+                        DashboardManager.log("   ⚠️ Could not extract download link: " + ex.getMessage());
+                    }
+
                 } catch (Exception e) {
                     DashboardManager.log("   ⚠️ Could not read email body: " + e.getMessage());
                 }
@@ -223,6 +246,8 @@ public class ReportGenerationCheckPage {
         if (!emailFound) {
             DashboardManager.log("   ❌ Report email NOT received within 3 minutes.");
         }
+
+        return downloadLink;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -236,7 +261,7 @@ public class ReportGenerationCheckPage {
         timeStr = timeStr.replace("AM", "").replace("PM", "").trim();
         String[] parts = timeStr.split(":");
         int hours = Integer.parseInt(parts[0].trim());
-        int minutes = Integer.parseInt(parts[1].trim()); // trim() already here
+        int minutes = Integer.parseInt(parts[1].trim());
         if (isPM && hours != 12) hours += 12;
         if (!isPM && hours == 12) hours = 0;
         return hours * 60 + minutes;

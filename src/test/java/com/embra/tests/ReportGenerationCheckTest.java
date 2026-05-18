@@ -16,13 +16,16 @@ public class ReportGenerationCheckTest {
     private Page adminPage;
     private Page gmailPage;
 
+    // Store report download link to include in automation email
+    private static String reportDownloadLink = "Not found";
+
     @BeforeAll
     static void setupBrowser() {
         DashboardManager.initReport();
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setChannel("chrome")
-                .setHeadless(true)
+                .setHeadless(false)
         );
     }
 
@@ -53,7 +56,7 @@ public class ReportGenerationCheckTest {
 
         ReportGenerationCheckPage reportPage = new ReportGenerationCheckPage(adminPage);
 
-        // ── STEP 1: Login ──────────────────────────────────────────
+        // ── STEP 1: Login to Admin Portal ─────────────────────────
         DashboardManager.log("\n[STEP 1] 🔑 Admin Login");
         reportPage.login();
 
@@ -65,24 +68,35 @@ public class ReportGenerationCheckTest {
         DashboardManager.log("\n[STEP 3] 🔍 Open Search & Filters");
         reportPage.openSearchFilters();
 
-        // ── STEP 4: Click Download Reports & capture time ──────────
+        // ── STEP 4: Click Download Reports & capture API response + time ──
         DashboardManager.log("\n[STEP 4] 📥 Click Download Reports");
         String reportClickTime = reportPage.clickDownloadReports();
 
-        // Save trace checkpoint
+        // Save admin trace after download report click
         try {
             context.tracing().stop(new Tracing.StopOptions()
                     .setPath(Paths.get("target/report-generation-admin-trace.zip")));
-            DashboardManager.log("   💾 Trace saved → target/report-generation-admin-trace.zip");
+            DashboardManager.log("   💾 Admin trace saved → target/report-generation-admin-trace.zip");
             context.tracing().start(new Tracing.StartOptions()
                     .setScreenshots(true).setSnapshots(true).setSources(true));
         } catch (Exception e) {
-            DashboardManager.log("   ⚠️ Could not save trace: " + e.getMessage());
+            DashboardManager.log("   ⚠️ Could not save admin trace: " + e.getMessage());
         }
 
         // ── STEP 5: Switch to Gmail tab & verify report email ──────
+        // Opens Gmail, waits for email at or after click time, extracts download link
         DashboardManager.log("\n[STEP 5] 📧 Open Gmail & Verify Report Email");
-        reportPage.openGmailAndVerifyReportEmail(gmailPage, reportClickTime);
+        reportDownloadLink = reportPage.openGmailAndVerifyReportEmail(gmailPage, reportClickTime);
+        DashboardManager.log("   -> Report Download Link: " + reportDownloadLink);
+
+        // Save gmail trace after email verification
+        try {
+            context.tracing().stop(new Tracing.StopOptions()
+                    .setPath(Paths.get("target/report-generation-gmail-trace.zip")));
+            DashboardManager.log("   💾 Gmail trace saved → target/report-generation-gmail-trace.zip");
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not save gmail trace: " + e.getMessage());
+        }
 
         DashboardManager.log("\n[REPORT] ✅ Report Generation Check Completed!");
     }
@@ -91,8 +105,10 @@ public class ReportGenerationCheckTest {
     void tearDown() {
         if (context != null) {
             try {
+                // Fallback trace — captures everything if test crashes mid-way
                 context.tracing().stop(new Tracing.StopOptions()
                         .setPath(Paths.get("target/report-generation-fallback-trace.zip")));
+                DashboardManager.log("   💾 Fallback trace saved → target/report-generation-fallback-trace.zip");
             } catch (Exception ignored) {}
             context.close();
         }
@@ -103,10 +119,18 @@ public class ReportGenerationCheckTest {
         if (browser != null) browser.close();
         if (playwright != null) playwright.close();
 
-        EmailSender.sendDashboardEmail(
+        // Flush report file before sending email
+        DashboardManager.flushReport();
+
+        // Send automation email with report download link included
+        EmailSender.sendReportCheckEmail(
                 "REPORT GENERATION CHECK DAILY",
+                reportDownloadLink,
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global","saumya.gupta@emb.global,gaurav.rauthan@emb.global,prakash@emb.global"
+                "bharat.pandey@emb.global",
+                "saumya.gupta@emb.global",
+                "gaurav.rauthan@emb.global"
+                //,"prakash@emb.global"
         );
     }
 }
