@@ -129,7 +129,8 @@ public class ReportGenerationCheckTest {
                 "bharatpandey011@gmail.com",
                 "bharat.pandey@emb.global",
                 "saumya.gupta@emb.global",
-                "gaurav.rauthan@emb.global"
+                "gaurav.rauthan@emb.global",
+                "ashish.mishra@emb.global"
                 //,"prakash@emb.global"
         );
     }
