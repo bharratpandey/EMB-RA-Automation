@@ -93,7 +93,7 @@ public class ProdHealthCheckTest {
         browser = playwright.chromium().launch(
                 new BrowserType.LaunchOptions()
                         .setChannel("chrome")
-                        .setHeadless(false)   // ← visible Chrome window
+                        .setHeadless(true)   // ← visible Chrome window
                         .setSlowMo(300)       // ← slight slow-mo so actions are watchable
         );
 
