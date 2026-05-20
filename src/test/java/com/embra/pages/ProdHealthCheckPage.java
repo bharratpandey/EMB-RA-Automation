@@ -20,34 +20,6 @@ import java.util.function.Supplier;
  * Production URLs:
  *   UI  : https://admin.embtalent.ai
  *   API : https://api-ra.embtalent.ai
- *
- * Full flow:
- *   Step 1  — Login
- *   Step 2  — Overview Tab
- *   Step 3  — Candidates Tab
- *   Step 4  — Clients Tab (Dashboard)
- *   Step 5  — Partners Tab
- *   Step 6  — Revenue Tab
- *   Step 7  — New Registrations
- *   Step 8  — Partner Listing  (/vendor)
- *   Step 9  — Partner Search
- *   Step 10 — Bench Listing    (/bench-details)
- *   Step 11 — Client Listing   (/clients-listing)
- *   Step 12 — Requirement Listing (/hiring-requests)
- *   Step 13 — New Requirement  (/client)
- *   Step 14 — Intervue.io      (/intervue)
- *   Step 15 — Currency Rates   (/currency-rates)
- *   Step 16 — EMB Convertor    (/jdconvertor)
- *   Step 17 — Users            (/users)
- *
- * Expected HTTP status codes:
- *   Login POST → 201 Created
- *   All others → 200 OK
- *
- * Response-time thresholds:
- *   0–300 ms   → ✅ Excellent/Instant
- *   301–800 ms → ⚠️  Acceptable
- *   > 800 ms   → 🔴 Slow
  */
 public class ProdHealthCheckPage {
 
@@ -113,9 +85,8 @@ public class ProdHealthCheckPage {
     }
 
     /**
-     * Many APIs wrap their payload inside a "data" object.
-     * This helper extracts the inner object so logMetric() finds keys correctly.
-     * Falls back to the full response if "data" key is not present.
+     * Unwraps the "data" object from API responses.
+     * Falls back to full JSON if no "data" wrapper exists.
      */
     private String unwrap(String json) {
         String inner = extractJsonString(json, "data");
@@ -172,12 +143,14 @@ public class ProdHealthCheckPage {
     //  STEP 1 — LOGIN
     // ================================================================== //
 
-    /**
-     * Browser: navigate to login page, fill credentials, click Login.
-     * API:     POST /api/v1/user/login → expected 201
-     */
     public String loginBrowserAndApi(String email, String password) {
         DashboardManager.log("   [Browser] Navigating to " + adminUiUrl + "/login");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/login");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/user/login");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.navigate(adminUiUrl + "/login");
         page.waitForSelector("input#email, input[name='email']");
         page.fill("input#email, input[name='email']", email);
@@ -220,9 +193,15 @@ public class ProdHealthCheckPage {
     //  STEP 2 — OVERVIEW TAB
     // ================================================================== //
 
-    /** Browser: click Overview tab. API: GET /overview → 200 */
     public void overviewBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Overview tab");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/dashboard");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/vendor/profile/overview"
+                + "?filter_type=custom&start_date=" + START_DATE + "&end_date=" + END_DATE);
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("button:has-text('Overview')");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Overview tab loaded");
@@ -254,9 +233,13 @@ public class ProdHealthCheckPage {
     //  STEP 3 — CANDIDATES TAB
     // ================================================================== //
 
-    /** Browser: click Candidates tab. API: POST /candidate_analytics → 200 */
     public void candidatesBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Candidates tab");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/bench_profile/candidate_analytics");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("button:has-text('Candidates')");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Candidates tab loaded");
@@ -276,9 +259,13 @@ public class ProdHealthCheckPage {
     //  STEP 4 — CLIENTS TAB (Dashboard)
     // ================================================================== //
 
-    /** Browser: click Clients tab. API: POST /client_analytics → 200 */
     public void clientsDashboardBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Clients tab");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/client/client_analytics");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("button:has-text('Clients')");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Clients tab loaded");
@@ -298,9 +285,13 @@ public class ProdHealthCheckPage {
     //  STEP 5 — PARTNERS TAB
     // ================================================================== //
 
-    /** Browser: click Partners tab. API: POST /partner_analytics → 200 */
     public void partnersBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Partners tab");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/profile/partner_analytics");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.locator("button:has-text('Partners')").first().click();
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Partners tab loaded");
@@ -317,12 +308,16 @@ public class ProdHealthCheckPage {
     }
 
     // ================================================================== //
-    //  STEP 6 — REVENUE TAB
+    //  STEP 6 — REVENUE TAB (kept for future use)
     // ================================================================== //
 
-    /** Browser: click Revenue tab. API: POST /requirement-revenue/analytics → 200 */
     public void revenueBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Revenue tab");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/requirement-revenue/analytics");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("button:has-text('Revenue')");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Revenue tab loaded");
@@ -342,9 +337,15 @@ public class ProdHealthCheckPage {
     //  STEP 7 — NEW REGISTRATIONS
     // ================================================================== //
 
-    /** Browser: click New Registrations sidebar. API: POST /pending_vendors → 200 */
     public void newRegistrationsBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking New Registrations sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/pending-approvals");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/profile/pending_vendors"
+                + "?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/pending-approvals']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ New Registrations page loaded");
@@ -368,14 +369,19 @@ public class ProdHealthCheckPage {
     //  STEP 8 — PARTNER LISTING (/vendor)
     // ================================================================== //
 
-    /**
-     * Browser: click Partner Listing sidebar.
-     * API: GET tech_skills, counts (print card values), timezones, locations,
-     *      POST all-vendors, GET currency
-     * Prints: All Partners, Active Partners, Rejected Partners, Suspended Partners
-     */
     public void partnerListingBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Partner Listing sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/vendor");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_tech_skills");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/vendor/profile/counts");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_preferred_timezones");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/geo/preferred_location");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/profile/all?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/currency/values");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/vendor']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Partner Listing page loaded");
@@ -392,18 +398,16 @@ public class ProdHealthCheckPage {
         APIResponse vendorCounts = timedCall("VendorCounts", () -> request.get(
                 baseUrl + "/api/v1/emb/vendor/profile/counts", authenticated(token)), 200, true);
         if (vendorCounts != null) {
+            // DEBUG — print raw response to identify exact key names
+            DashboardManager.log("   [RAW VendorCounts] " + vendorCounts.text());
             String src = unwrap(vendorCounts.text());
             DashboardManager.log("   ┌────────────────────────────────────┐");
             DashboardManager.log("   │  PARTNER LISTING — CARD VALUES     │");
             DashboardManager.log("   ├────────────────────────────────────┤");
-            logMetric(src, "all_partners",       "  All Partners              ");
-            logMetric(src, "active_partners",    "  Active Partners           ");
-            logMetric(src, "rejected_partners",  "  Rejected Partners         ");
-            logMetric(src, "suspended_partners", "  Suspended Partners        ");
-            logMetric(src, "all",                "  All (fallback)            ");
-            logMetric(src, "active",             "  Active (fallback)         ");
-            logMetric(src, "rejected",           "  Rejected (fallback)       ");
-            logMetric(src, "suspended",          "  Suspended (fallback)      ");
+            logMetric(src, "total_vendors",     "  All Partners              ");
+            logMetric(src, "approved_vendors",  "  Active Partners           ");
+            logMetric(src, "rejected_vendors",  "  Rejected Partners         ");
+            logMetric(src, "suspended_vendors", "  Suspended Partners        ");
             DashboardManager.log("   └────────────────────────────────────┘");
         }
 
@@ -437,9 +441,14 @@ public class ProdHealthCheckPage {
     //  STEP 9 — PARTNER SEARCH
     // ================================================================== //
 
-    /** Browser: type "bharat pvt ltd". API: POST /all?search_term → 200 */
     public void partnerSearchBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Opening Search & Filters panel");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/vendor (search)");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/profile/all?search_term=bharat%20pvt%20ltd&limit=25&page=1&report=false");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         try {
             page.locator("div.font-semibold:has-text('Search')").first().click();
             page.waitForTimeout(600);
@@ -475,12 +484,20 @@ public class ProdHealthCheckPage {
     //  STEP 10 — BENCH LISTING (/bench-details)
     // ================================================================== //
 
-    /**
-     * Browser: click Bench Listing sidebar.
-     * Prints: Total Resources, Available Resources, Onsite Resources, Remote Resources
-     */
     public void benchListingBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Bench Listing sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/bench-details");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_tech_skills");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/vendor/profile/counts");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_preferred_timezones");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/geo/preferred_location");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/profile/all?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/vendor/bench_profile/counts");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/vendor/bench_profile/all?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/bench-details']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Bench Listing page loaded");
@@ -546,12 +563,15 @@ public class ProdHealthCheckPage {
     //  STEP 11 — CLIENT LISTING (/clients-listing)
     // ================================================================== //
 
-    /**
-     * Browser: click Client Listing sidebar.
-     * Prints: All Clients, Active Clients, New Clients, Suspended Clients
-     */
     public void clientListingBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Client Listing sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/clients-listing");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/client/res/counts");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/client/all?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/clients-listing']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Client Listing page loaded");
@@ -590,18 +610,17 @@ public class ProdHealthCheckPage {
     //  STEP 12 — REQUIREMENT LISTING (/hiring-requests)
     // ================================================================== //
 
-    /**
-     * Browser: click Requirement Listing sidebar.
-     * Prints: Total Requirements, Active Requirements, Closed Requirements, On-Hold Requirements
-     *
-     * Confirmed API key names from raw response:
-     *   all_requirements     → Total Requirements
-     *   ongoing_requirements → Active Requirements
-     *   complete_requirements→ Closed Requirements
-     *   onhold_requirements  → On-Hold Requirements
-     */
     public void requirementListingBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Requirement Listing sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/hiring-requests");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/requirement/all?search_term=&limit=25&page=1&report=false");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_preferred_timezones");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/geo/preferred_location");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/requirement/status-counts");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/hiring-requests']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Requirement Listing page loaded");
@@ -628,7 +647,8 @@ public class ProdHealthCheckPage {
         APIResponse statusCounts = timedCall("RequirementStatusCounts", () -> request.get(
                 baseUrl + "/api/v1/emb/requirement/status-counts", authenticated(token)), 200, true);
         if (statusCounts != null) {
-            // Keys confirmed from raw API response — nested under "data"
+            // Keys confirmed from raw API: nested under "data"
+            // all_requirements, ongoing_requirements, complete_requirements, onhold_requirements
             String src = unwrap(statusCounts.text());
             DashboardManager.log("   ┌──────────────────────────────────────┐");
             DashboardManager.log("   │  REQUIREMENT LISTING — CARD VALUES   │");
@@ -645,9 +665,15 @@ public class ProdHealthCheckPage {
     //  STEP 13 — NEW REQUIREMENT (/client)
     // ================================================================== //
 
-    /** Browser: click New Requirement sidebar. API: currency + timezones → 200 */
     public void newRequirementBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking New Requirement sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/client");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/currency/values");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/utility/get_preferred_timezones");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/client']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ New Requirement page loaded");
@@ -665,12 +691,15 @@ public class ProdHealthCheckPage {
     //  STEP 14 — INTERVUE.IO (/intervue)
     // ================================================================== //
 
-    /**
-     * Browser: click Intervue.io sidebar.
-     * Prints: Total Assessments, Completed, Active, Cancelled
-     */
     public void intervueBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Intervue.io sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/intervue");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/intervue/intervue-overview");
+        DashboardManager.log("   POST " + baseUrl + "/api/v1/emb/intervue/all?search_term=&limit=25&page=1");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/intervue']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Intervue.io page loaded");
@@ -687,12 +716,11 @@ public class ProdHealthCheckPage {
             logMetric(src, "completed_assessments", "  Completed Assessments     ");
             logMetric(src, "active_assessments",    "  Active Assessments        ");
             logMetric(src, "cancelled_assessments", "  Cancelled Assessments     ");
-            // fallback keys
-            logMetric(src, "total",      "  Total (fallback)          ");
-            logMetric(src, "completed",  "  Completed (fallback)      ");
-            logMetric(src, "active",     "  Active (fallback)         ");
-            logMetric(src, "cancelled",  "  Cancelled (fallback)      ");
-            logMetric(src, "cancel",     "  Cancel (alt key)          ");
+            logMetric(src, "total",                 "  Total (fallback)          ");
+            logMetric(src, "completed",             "  Completed (fallback)      ");
+            logMetric(src, "active",                "  Active (fallback)         ");
+            logMetric(src, "cancelled",             "  Cancelled (fallback)      ");
+            logMetric(src, "cancel",                "  Cancel (alt key)          ");
             DashboardManager.log("   └────────────────────────────────────┘");
         }
 
@@ -710,9 +738,15 @@ public class ProdHealthCheckPage {
     //  STEP 15 — CURRENCY RATES (/currency-rates)
     // ================================================================== //
 
-    /** Browser: click Currency Rates sidebar. API: currency/values + exchange-rate/all → 200 */
     public void currencyRatesBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Currency Rates sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/currency-rates");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/currency/values");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/emb/exchange-rate/all");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/currency-rates']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ Currency Rates page loaded");
@@ -734,9 +768,14 @@ public class ProdHealthCheckPage {
     //  STEP 16 — EMB CONVERTOR (/jdconvertor)
     // ================================================================== //
 
-    /** Browser: click EMB Convertor sidebar. API: page load check → 200 */
     public void embConvertorBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking EMB Convertor sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/jdconvertor");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + adminUiUrl + "/jdconvertor?_rsc=ass8g  (Next.js RSC page load)");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/jdconvertor']");
         page.waitForTimeout(2000);
         DashboardManager.log("   [Browser] ✅ EMB Convertor page loaded");
@@ -761,9 +800,14 @@ public class ProdHealthCheckPage {
     //  STEP 17 — USERS (/users)
     // ================================================================== //
 
-    /** Browser: click Users sidebar + refresh. API: GET /user/all → 200 */
     public void usersBrowserAndApi(String token) {
         DashboardManager.log("   [Browser] Clicking Users sidebar link");
+        DashboardManager.log("   [URL] " + adminUiUrl + "/users");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+        DashboardManager.log("   APIs checked:");
+        DashboardManager.log("   GET  " + baseUrl + "/api/v1/user/all");
+        DashboardManager.log("   ─────────────────────────────────────────────────");
+
         page.click("a[href='/users']");
         page.waitForTimeout(1500);
         DashboardManager.log("   [Browser] Refreshing page (as per sanity script)");
@@ -820,10 +864,9 @@ public class ProdHealthCheckPage {
             int valEnd = json.indexOf("\"", valStart + 1);
             return valEnd == -1 ? null : json.substring(valStart + 1, valEnd);
         }
-        // Handle nested object — return the raw substring between { }
+        // Handle nested object — return substring between { }
         if (json.charAt(valStart) == '{') {
-            int depth = 0;
-            int end = valStart;
+            int depth = 0, end = valStart;
             while (end < json.length()) {
                 if (json.charAt(end) == '{') depth++;
                 else if (json.charAt(end) == '}') { depth--; if (depth == 0) break; }
