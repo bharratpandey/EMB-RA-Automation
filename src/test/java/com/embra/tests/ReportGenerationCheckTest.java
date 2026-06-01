@@ -111,7 +111,10 @@ public class ReportGenerationCheckTest {
                 "REPORT GENERATION CHECK DAILY",
                 reportDownloadLink,
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global"
+                "bharat.pandey@emb.global",
+                "gaurav.rauthan@emb.global",
+                "Ashish.mishra@emb.global",
+                "saumya.gupta@emb.global"
         );
     }
 }
