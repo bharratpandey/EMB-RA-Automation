@@ -44,3 +44,5 @@ build/
 ### Secrets — never commit real credentials ###
 .env.claude/
 .claude/
+.env
+auth/
