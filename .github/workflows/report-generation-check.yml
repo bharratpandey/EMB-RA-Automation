@@ -23,11 +23,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Restore Google session
-        run: |
-          mkdir -p auth
-          echo "${{ secrets.GOOGLE_STATE }}" | tr -d ' \n\r' | base64 -d > auth/google_state.json || true
-
       - name: Install system dependencies for Chromium
         run: |
           sudo apt-get update
@@ -48,6 +43,7 @@ jobs:
         run: xvfb-run mvn test -Dtest=ReportGenerationCheckTest
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          IMAP_APP_PASSWORD: ${{ secrets.IMAP_APP_PASSWORD }}
 
       - name: Upload Dashboard Backup
         if: always()

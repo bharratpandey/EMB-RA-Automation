@@ -3,14 +3,24 @@ package com.embra.pages;
 import com.embra.utils.DashboardManager;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import jakarta.mail.*;
+import jakarta.mail.internet.MimeMultipart;
+import jakarta.mail.search.*;
+
+import java.util.Properties;
 
 public class ReportGenerationCheckPage {
 
     private final Page page;
 
-    private static final String ADMIN_URL = "https://admin.embtalent.ai/login";
-    private static final String EMAIL     = "bharat.pandey@emb.global";
-    private static final String PASSWORD  = "Emb@1234";
+    private static final String ADMIN_URL    = "https://admin.embtalent.ai/login";
+    private static final String EMAIL        = "bharat.pandey@emb.global";
+    private static final String PASSWORD     = "Emb@1234";
+
+    // ── IMAP credentials for email check ──────────────────────────
+    // Use app password for bharat.pandey@emb.global from myaccount.google.com/apppasswords
+    private static final String IMAP_EMAIL   = "bharat.pandey@emb.global";
+   // private static final String IMAP_APP_PWD = "vgctlqqxazodwets"; // ← replace this
 
     public ReportGenerationCheckPage(Page page) {
         this.page = page;
@@ -109,20 +119,15 @@ public class ReportGenerationCheckPage {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 5. OPEN GMAIL & WAIT FOR REPORT EMAIL
+    // 5. CHECK EMAIL VIA IMAP — no browser session needed
     // Returns the download link found inside the email body
     // ──────────────────────────────────────────────────────────────
 
     public String openGmailAndVerifyReportEmail(Page gmailPage, String reportClickTime) {
-        DashboardManager.log("\n--- 📧 OPENING GMAIL TO VERIFY REPORT EMAIL ---");
+        DashboardManager.log("\n--- 📧 CHECKING EMAIL VIA IMAP ---");
         DashboardManager.log("   -> Report was requested at: " + reportClickTime);
 
         String downloadLink = "Not found";
-
-        gmailPage.bringToFront();
-        gmailPage.navigate("https://mail.google.com");
-        gmailPage.waitForLoadState();
-        gmailPage.waitForTimeout(3000);
 
         // Convert click time to minutes for comparison
         int clickMinutes = -1;
@@ -134,120 +139,167 @@ public class ReportGenerationCheckPage {
             DashboardManager.log("   ⚠️ Could not convert click time: " + e.getMessage());
         }
 
-        DashboardManager.log("   -> Waiting for report email (refreshing every 5s, max 3 min)...");
+        // Get app password from env or fallback
+        // Get app password — from env var (CI) or .env file (local)
+        String envPassword = System.getenv("IMAP_APP_PASSWORD");
+        if (envPassword == null || envPassword.isEmpty()) {
+            try {
+                io.github.cdimascio.dotenv.Dotenv dotenv =
+                        io.github.cdimascio.dotenv.Dotenv.configure().ignoreIfMissing().load();
+                envPassword = dotenv.get("IMAP_APP_PASSWORD", "");
+            } catch (Exception ignored) {}
+        }
+        String appPassword = envPassword;
 
-        boolean emailFound = false;
-        int maxAttempts = 36;
+        // IMAP connection properties
+        Properties props = new Properties();
+        props.put("mail.imap.host", "imap.gmail.com");
+        props.put("mail.imap.port", "993");
+        props.put("mail.imap.ssl.enable", "true");
+        props.put("mail.imap.ssl.trust", "imap.gmail.com");
 
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            DashboardManager.log("   -> Attempt " + attempt + "/" + maxAttempts + " — checking inbox...");
+        DashboardManager.log("   -> Connecting to IMAP...");
 
-            gmailPage.reload();
-            gmailPage.waitForTimeout(3000);
+        Store store = null;
+        Folder inbox = null;
 
-            // Find emails from Team EMBTalent with report subject
-            Locator emailRows = gmailPage.locator("tr.zA")
-                    .filter(new Locator.FilterOptions().setHasText("Team EMBTalent"))
-                    .filter(new Locator.FilterOptions().setHasText("EMBTalent: Your Requested Report"));
+        try {
+            Session session = Session.getInstance(props);
+            store = session.getStore("imap");
+            store.connect("imap.gmail.com", IMAP_EMAIL, appPassword);
+            DashboardManager.log("   ✅ IMAP connected.");
 
-            int count = emailRows.count();
-            DashboardManager.log("   -> Found " + count + " matching email(s).");
+            inbox = store.getFolder("INBOX");
+            inbox.open(Folder.READ_ONLY);
 
-            for (int i = 0; i < count; i++) {
-                Locator row = emailRows.nth(i);
-                boolean shouldSkip = false;
+            DashboardManager.log("   -> Waiting for report email (checking every 5s, max 3 min)...");
 
-                try {
-                    String titleAttr = row.locator("td.xW span[title]").getAttribute("title");
-                    DashboardManager.log("   -> Email title attr: " + titleAttr);
+            int maxAttempts = 36;
+            boolean emailFound = false;
 
-                    if (titleAttr != null && clickMinutes >= 0) {
-                        // Extract time from "Thu, May 14, 2026, 4:07 PM"
-                        String timePart = titleAttr.substring(titleAttr.lastIndexOf(", ") + 2)
-                                .replaceAll("[^0-9:AaPpMm ]", "")
-                                .replaceAll("\\s+", " ")
-                                .trim();
-                        DashboardManager.log("   -> Email received at: " + timePart);
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                DashboardManager.log("   -> Attempt " + attempt + "/" + maxAttempts + " — checking inbox...");
 
-                        try {
-                            int emailMinutes = convertToMinutes(timePart);
-                            DashboardManager.log("   -> Email minutes: " + emailMinutes
-                                    + ", Click minutes: " + clickMinutes);
+                // Search for emails with matching subject
+                SearchTerm subjectTerm = new SubjectTerm("EMBTalent: Your Requested Report");
+                SearchTerm fromTerm = new FromStringTerm("team@embtalent.ai");
+                SearchTerm combinedTerm = new AndTerm(subjectTerm, fromTerm);
 
-                            if (emailMinutes < clickMinutes) {
-                                DashboardManager.log("   ⏭️ Email at " + timePart
-                                        + " is before click time " + reportClickTime + " — skipping.");
-                                shouldSkip = true;
-                            } else {
-                                DashboardManager.log("   ✅ Email time " + timePart
-                                        + " is at or after click time — valid!");
-                            }
-                        } catch (Exception ex) {
-                            DashboardManager.log("   ⚠️ Time comparison failed: "
-                                    + ex.getMessage() + " — skipping to be safe.");
-                            shouldSkip = true;
+                Message[] messages = inbox.search(combinedTerm);
+                DashboardManager.log("   -> Found " + messages.length + " matching email(s).");
+
+                // Check from newest to oldest
+                for (int i = messages.length - 1; i >= 0; i--) {
+                    Message msg = messages[i];
+
+                    // Get received date
+                    java.util.Date receivedDate = msg.getReceivedDate();
+                    if (receivedDate == null) receivedDate = msg.getSentDate();
+
+                    if (receivedDate != null && clickMinutes >= 0) {
+                        // Convert received time to minutes
+                        java.util.Calendar cal = java.util.Calendar.getInstance();
+                        cal.setTime(receivedDate);
+                        int emailHours = cal.get(java.util.Calendar.HOUR_OF_DAY);
+                        int emailMins = cal.get(java.util.Calendar.MINUTE);
+                        int emailMinutes = emailHours * 60 + emailMins;
+
+                        String emailTimeStr = String.format("%02d:%02d", emailHours, emailMins);
+                        DashboardManager.log("   -> Email received at: " + emailTimeStr
+                                + " (" + emailMinutes + " min), Click at: " + clickMinutes + " min");
+
+                        if (emailMinutes < clickMinutes) {
+                            DashboardManager.log("   ⏭️ Email is before click time — skipping.");
+                            continue;
                         }
+                        DashboardManager.log("   ✅ Email time is at or after click time — valid!");
                     }
-                } catch (Exception e) {
-                    DashboardManager.log("   ⚠️ Could not read email time: " + e.getMessage());
-                }
 
-                if (shouldSkip) continue;
-
-                // Open the email
-                row.click();
-                gmailPage.waitForLoadState();
-                gmailPage.waitForTimeout(2000);
-                DashboardManager.log("   ✅ Email opened.");
-
-                // Verify content and extract download link
-                try {
-                    String body = gmailPage.locator("div.a3s").first().innerText().trim();
-                    DashboardManager.log("   -> Email body preview: "
-                            + body.substring(0, Math.min(200, body.length())));
+                    // Extract body and download link
+                    DashboardManager.log("   -> Reading email body...");
+                    String body = getEmailBody(msg);
 
                     if (body.contains("Your Requested Report") || body.contains("Download Report")) {
-                        DashboardManager.log("   ✅ Email content verified — Download Report link present.");
-                    } else {
-                        DashboardManager.log("   ❌ Email content mismatch.");
+                        DashboardManager.log("   ✅ Email content verified — Download Report present.");
                     }
 
-                    // Extract download link from anchor tag inside email body
-                    try {
-                        Locator linkLocator = gmailPage.locator("div.a3s a")
-                                .filter(new Locator.FilterOptions().setHasText("Download Report"))
-                                .first();
-                        downloadLink = linkLocator.getAttribute("href");
-                        if (downloadLink != null && !downloadLink.isEmpty()) {
+                    // Extract download link using regex
+                    java.util.regex.Pattern linkPattern = java.util.regex.Pattern.compile(
+                            "href=[\"'](https?://[^\"']+)[\"']",
+                            java.util.regex.Pattern.CASE_INSENSITIVE);
+                    java.util.regex.Matcher matcher = linkPattern.matcher(body);
+
+                    while (matcher.find()) {
+                        String href = matcher.group(1);
+                        // Look for blob storage or download links
+                        if (href.contains("blob") || href.contains("download") || href.contains("report")) {
+                            downloadLink = href;
                             DashboardManager.log("   ✅ Download link extracted: " + downloadLink);
-                        } else {
-                            DashboardManager.log("   ⚠️ Download link href is empty.");
-                            downloadLink = "Not found";
+                            break;
                         }
-                    } catch (Exception ex) {
-                        DashboardManager.log("   ⚠️ Could not extract download link: " + ex.getMessage());
                     }
 
-                } catch (Exception e) {
-                    DashboardManager.log("   ⚠️ Could not read email body: " + e.getMessage());
+                    emailFound = true;
+                    break;
                 }
 
-                emailFound = true;
-                break;
+                if (emailFound) break;
+
+                if (attempt < maxAttempts) {
+                    Thread.sleep(5000);
+                }
             }
 
-            if (emailFound) break;
-
-            if (attempt < maxAttempts) {
-                gmailPage.waitForTimeout(5000);
+            if (!emailFound) {
+                DashboardManager.log("   ❌ Report email NOT received within 3 minutes.");
             }
-        }
 
-        if (!emailFound) {
-            DashboardManager.log("   ❌ Report email NOT received within 3 minutes.");
+        } catch (Exception e) {
+            DashboardManager.log("   ❌ IMAP error: " + e.getMessage());
+        } finally {
+            // Close connections
+            try { if (inbox != null) inbox.close(false); } catch (Exception ignored) {}
+            try { if (store != null) store.close(); } catch (Exception ignored) {}
         }
 
         return downloadLink;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // HELPER: Extract text body from email message
+    // ──────────────────────────────────────────────────────────────
+
+    private String getEmailBody(Message message) {
+        try {
+            Object content = message.getContent();
+            if (content instanceof String) {
+                return (String) content;
+            } else if (content instanceof MimeMultipart) {
+                return getTextFromMimeMultipart((MimeMultipart) content);
+            }
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not read email body: " + e.getMessage());
+        }
+        return "";
+    }
+
+    private String getTextFromMimeMultipart(MimeMultipart mimeMultipart) {
+        StringBuilder result = new StringBuilder();
+        try {
+            for (int i = 0; i < mimeMultipart.getCount(); i++) {
+                BodyPart bodyPart = mimeMultipart.getBodyPart(i);
+                if (bodyPart.isMimeType("text/plain")) {
+                    result.append(bodyPart.getContent());
+                } else if (bodyPart.isMimeType("text/html")) {
+                    result.append(bodyPart.getContent());
+                } else if (bodyPart.getContent() instanceof MimeMultipart) {
+                    result.append(getTextFromMimeMultipart((MimeMultipart) bodyPart.getContent()));
+                }
+            }
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Could not parse multipart: " + e.getMessage());
+        }
+        return result.toString();
     }
 
     // ──────────────────────────────────────────────────────────────

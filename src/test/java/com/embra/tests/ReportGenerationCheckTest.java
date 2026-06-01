@@ -14,7 +14,6 @@ public class ReportGenerationCheckTest {
     private static Browser browser;
     private BrowserContext context;
     private Page adminPage;
-    private Page gmailPage;
 
     // Store report download link to include in automation email
     private static String reportDownloadLink = "Not found";
@@ -31,22 +30,16 @@ public class ReportGenerationCheckTest {
 
     @BeforeEach
     void setup() {
-        // Single context with Google session — both tabs share same window
+        // Single context — only admin tab needed now, Gmail checked via IMAP
         context = browser.newContext(new Browser.NewContextOptions()
-                .setViewportSize(1280, 720)
-                .setStorageStatePath(Paths.get("auth/google_state.json")));
+                .setViewportSize(1280, 720));
         context.tracing().start(new Tracing.StartOptions()
                 .setScreenshots(true).setSnapshots(true).setSources(true));
 
-        // Tab 1 — Admin portal
+        // Tab 1 — Admin portal only
         adminPage = context.newPage();
         adminPage.setDefaultTimeout(60000);
         adminPage.setDefaultNavigationTimeout(90000);
-
-        // Tab 2 — Gmail (same window, same session)
-        gmailPage = context.newPage();
-        gmailPage.setDefaultTimeout(60000);
-        gmailPage.setDefaultNavigationTimeout(90000);
     }
 
     @Test
@@ -83,20 +76,11 @@ public class ReportGenerationCheckTest {
             DashboardManager.log("   ⚠️ Could not save admin trace: " + e.getMessage());
         }
 
-        // ── STEP 5: Switch to Gmail tab & verify report email ──────
-        // Opens Gmail, waits for email at or after click time, extracts download link
-        DashboardManager.log("\n[STEP 5] 📧 Open Gmail & Verify Report Email");
-        reportDownloadLink = reportPage.openGmailAndVerifyReportEmail(gmailPage, reportClickTime);
+        // ── STEP 5: Check email via IMAP — no browser session needed ──
+        // Connects directly to Gmail IMAP, no session expiry issues
+        DashboardManager.log("\n[STEP 5] 📧 Check Report Email via IMAP");
+        reportDownloadLink = reportPage.openGmailAndVerifyReportEmail(null, reportClickTime);
         DashboardManager.log("   -> Report Download Link: " + reportDownloadLink);
-
-        // Save gmail trace after email verification
-        try {
-            context.tracing().stop(new Tracing.StopOptions()
-                    .setPath(Paths.get("target/report-generation-gmail-trace.zip")));
-            DashboardManager.log("   💾 Gmail trace saved → target/report-generation-gmail-trace.zip");
-        } catch (Exception e) {
-            DashboardManager.log("   ⚠️ Could not save gmail trace: " + e.getMessage());
-        }
 
         DashboardManager.log("\n[REPORT] ✅ Report Generation Check Completed!");
     }
@@ -127,11 +111,7 @@ public class ReportGenerationCheckTest {
                 "REPORT GENERATION CHECK DAILY",
                 reportDownloadLink,
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global",
-                "saumya.gupta@emb.global",
-                "gaurav.rauthan@emb.global",
-                "ashish.mishra@emb.global"
-                //,"prakash@emb.global"
+                "bharat.pandey@emb.global"
         );
     }
 }
