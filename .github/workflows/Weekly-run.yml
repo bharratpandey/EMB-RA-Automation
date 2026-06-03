@@ -38,13 +38,129 @@ jobs:
           java -cp "$PLAYWRIGHT_JAR:$DRIVER_JAR:$BUNDLE_JAR" com.microsoft.playwright.CLI install chromium
 
       - name: Run E2E Tests
+        id: run_test
         run: xvfb-run mvn test -Dtest=CreateRequirementTest
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
 
-      - name: Upload Dashboard Backup
+      - name: Upload Dashboard
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Automation-Dashboard
           path: target/AutomationDashboard.html
+
+      - name: Upload Full E2E Trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: E2E-Full-Trace
+          path: target/e2e-full-trace.zip
+
+      - name: Upload Crash Trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: E2E-Crash-Trace
+          path: target/e2e-crash-trace.zip
+
+      # ── Save report + traces to Supabase ─────────────────────────
+      - name: Save to Supabase Dashboard
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          # Determine status
+          if [ "${{ steps.run_test.outcome }}" == "success" ]; then
+            STATUS="PASS"
+          else
+            STATUS="FAIL"
+          fi
+
+          TIMESTAMP=$(date +%s)
+          REPORT_URL="null"
+          TRACES_JSON="[]"
+
+          # Upload HTML report
+          REPORT_FILE="target/AutomationDashboard.html"
+          if [ -f "$REPORT_FILE" ]; then
+            REPORT_NAME="EMB_RA_WeeklyE2E_${TIMESTAMP}.html"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: text/html" \
+              -H "x-upsert: true" \
+              --data-binary @"${REPORT_FILE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${REPORT_NAME}")
+            echo "Report upload HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              REPORT_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${REPORT_NAME}"
+              echo "Report URL: $REPORT_URL"
+            fi
+          fi
+
+          # Upload full E2E trace
+          TRACE_URLS="[]"
+          FULL_TRACE="target/e2e-full-trace.zip"
+          if [ -f "$FULL_TRACE" ]; then
+            TRACE_NAME="EMB_RA_WeeklyE2E_trace_${TIMESTAMP}.zip"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: application/zip" \
+              -H "x-upsert: true" \
+              --data-binary @"${FULL_TRACE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${TRACE_NAME}")
+            echo "Full trace upload HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              FULL_TRACE_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${TRACE_NAME}"
+              TRACE_URLS="[{\"name\":\"e2e-full-trace.zip\",\"url\":\"${FULL_TRACE_URL}\"}]"
+              echo "Full trace URL: $FULL_TRACE_URL"
+            fi
+          fi
+
+          # Upload crash trace (only exists on failure)
+          CRASH_TRACE="target/e2e-crash-trace.zip"
+          if [ -f "$CRASH_TRACE" ]; then
+            CRASH_NAME="EMB_RA_WeeklyE2E_crash_trace_${TIMESTAMP}.zip"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: application/zip" \
+              -H "x-upsert: true" \
+              --data-binary @"${CRASH_TRACE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${CRASH_NAME}")
+            echo "Crash trace upload HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              CRASH_TRACE_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${CRASH_NAME}"
+              # Append crash trace to traces array
+              TRACE_URLS=$(echo "$TRACE_URLS" | sed "s/\]$/,{\"name\":\"e2e-crash-trace.zip\",\"url\":\"${CRASH_TRACE_URL}\"}]/")
+              echo "Crash trace URL: $CRASH_TRACE_URL"
+            fi
+          fi
+
+          # Insert row into test_reports
+          curl -s -X POST \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"project\": \"EMB_RA\",
+              \"environment\": \"UAT\",
+              \"status\": \"${STATUS}\",
+              \"passed\": 0,
+              \"failed\": 0,
+              \"total\": 0,
+              \"duration_seconds\": 0,
+              \"report_url\": $([ "$REPORT_URL" = "null" ] && echo "null" || echo "\"${REPORT_URL}\""),
+              \"trace_url\": null,
+              \"traces\": ${TRACE_URLS}
+            }" \
+            "${SUPABASE_URL}/rest/v1/test_reports"
+
+          echo "✅ Saved to Supabase dashboard (status: ${STATUS})"
