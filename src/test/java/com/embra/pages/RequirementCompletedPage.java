@@ -35,7 +35,21 @@ public class RequirementCompletedPage {
         // Open specific Candidate View
         Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(candidateName))
                 .filter(new Locator.FilterOptions().setHasText(vendorName)).first();
-        candidateRow.locator("button[title='View Details']").click();
+
+// Dismiss chatbot popup if visible — it overlays and blocks clicks
+        try {
+            Locator chatbot = page.locator("div").filter(new Locator.FilterOptions().setHasText("Want to check bench status?")).last();
+            if (chatbot.isVisible()) {
+                page.locator("button").filter(new Locator.FilterOptions().setHasText("×")).last().click();
+                page.waitForTimeout(500);
+                DashboardManager.log("   -> Chatbot popup dismissed.");
+            }
+        } catch (Exception ignored) {}
+
+// Scroll into view and click with force to bypass any overlay
+        candidateRow.scrollIntoViewIfNeeded();
+        page.waitForTimeout(500);
+        candidateRow.locator("button[title='View Details']").click(new Locator.ClickOptions().setForce(true));
         page.waitForTimeout(2000);
 
         page.reload();
@@ -146,10 +160,15 @@ public class RequirementCompletedPage {
         DashboardManager.log("   -> Searching for Clean ID: [" + cleanName + "]");
 
         page.navigate(url);
-        page.locator("input[name='email']").fill(email);
-        page.locator("input[name='password']").fill(pass);
-        page.locator("button[type='submit']").click();
-        page.waitForLoadState();
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(pass);
+            page.locator("button[type='submit']").click();
+            page.waitForLoadState();
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
 
         // Dismiss Tutorial
         try {

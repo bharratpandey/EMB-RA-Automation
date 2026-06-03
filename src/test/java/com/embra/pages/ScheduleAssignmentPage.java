@@ -219,11 +219,15 @@ public class ScheduleAssignmentPage {
 
         // 1. Login & Navigate
         page.navigate(vendorUrl);
-        page.locator("input[name='email']").fill(email);
-        page.locator("input[name='password']").fill(password);
-        page.locator("button[type='submit']").click();
-        page.waitForTimeout(3000);
-
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(password);
+            page.locator("button[type='submit']").click();
+            page.waitForTimeout(3000);
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
         page.locator("a[href='/projects']").click();
         page.waitForTimeout(2000);
 
@@ -435,10 +439,15 @@ Locator candidateRow = page.locator("tr").filter(new Locator.FilterOptions().set
 
         // 1. Login
         page.navigate(vendorUrl);
-        page.locator("input[name='email']").fill(email);
-        page.locator("input[name='password']").fill(password);
-        page.locator("button[type='submit']").click();
-        page.waitForTimeout(3000);
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(password);
+            page.locator("button[type='submit']").click();
+            page.waitForTimeout(3000);
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
 
         // 2. Go to Projects
         page.locator("a[href='/projects']").click();

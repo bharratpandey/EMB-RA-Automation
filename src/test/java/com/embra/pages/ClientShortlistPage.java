@@ -50,7 +50,23 @@ public class ClientShortlistPage {
 
         String cleanName = reqName.contains("ReqTest-") ? reqName.substring(reqName.indexOf("ReqTest-")) : reqName;
         DashboardManager.log("   -> Opening Job: " + cleanName);
-        page.locator("h3").filter(new Locator.FilterOptions().setHasText(cleanName)).first().click();
+
+// Search for the job using the search filter
+        try {
+            Locator searchInput = page.locator("input[placeholder='Find a Jobs by: Name, Current status']");
+            searchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+            searchInput.fill(cleanName);
+            page.waitForTimeout(2000);
+            DashboardManager.log("   -> Search filter filled with: " + cleanName);
+        } catch (Exception e) {
+            DashboardManager.log("   ⚠️ Search input not found: " + e.getMessage());
+        }
+
+// Click the job card link from search results
+        Locator jobCard = page.locator("a[href*='jobs/details']")
+                .filter(new Locator.FilterOptions().setHasText(cleanName)).first();
+        jobCard.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+        jobCard.click();
         page.waitForTimeout(2000);
 
         // 🚀 NEW: Click on the 'Candidate' Tab

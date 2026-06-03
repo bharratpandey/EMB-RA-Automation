@@ -23,10 +23,15 @@ public class UploadInterviewPage {
 
         // Login
         page.navigate(vendorUrl);
-        page.locator("input[name='email']").fill(email);
-        page.locator("input[name='password']").fill(password);
-        page.locator("button[type='submit']").click();
-        page.waitForTimeout(3000);
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(password);
+            page.locator("button[type='submit']").click();
+            page.waitForTimeout(3000);
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
 
         // Go to Projects
         page.locator("a[href='/projects']").click();
@@ -246,10 +251,15 @@ public class UploadInterviewPage {
 
         // Login
         page.navigate(vendorUrl);
-        page.locator("input[name='email']").fill(email);
-        page.locator("input[name='password']").fill(password);
-        page.locator("button[type='submit']").click();
-        page.waitForTimeout(3000);
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(password);
+            page.locator("button[type='submit']").click();
+            page.waitForTimeout(3000);
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
 
         // Go to Projects
         page.locator("a[href='/projects']").click();
