@@ -24,33 +24,34 @@ public class ScheduleInterviewAssignmentAssessmentTest {
     private static Playwright playwright;
     private static Browser browser;
     private BrowserContext context;
-    private Page page;
+
+    // ── Single browser window — two tabs (admin, vendor) ──
+    private Page adminPage;
+    private Page vendorPage;
 
     private static final String JD_FILE_PATH = "src/test/resources/Anurag_DesignResume (2).pdf";
-
     private static final String TARGET_REQUIREMENT = "ReqTest-1778055195163";
 
-    private static final String VENDOR_URL = "https://uat-vendor.embtalent.ai/login";
-    private static final String VENDOR_EMAIL = "bharat.pandey@emb.global";
-    private static final String VENDOR_PASS = "Emb@1234";
+    // ── URLs ──────────────────────────────────────────────
+    private static final String ADMIN_URL      = "https://uat-admin.embtalent.ai/login";
+    private static final String VENDOR_URL     = "https://uat-vendor.embtalent.ai/login";
+    private static final String VENDOR_DASHBOARD = "https://uat-vendor.embtalent.ai/projects";
 
-    // ── Trace counter — each segment gets a unique file, no overwrites ──
+    // ── Credentials ───────────────────────────────────────
+    private static final String VENDOR_EMAIL = "bharat.pandey@emb.global";
+    private static final String VENDOR_PASS  = "Emb@1234";
+
+    // ── Trace counter kept for logging only — no actual stop/start ──
     private int adminTraceCounter = 0;
 
+    // ── No-op trace methods — single continuous trace runs from setup() to tearDown() ──
     private void startAdminTrace(String name, String title) {
-        context.tracing().start(new Tracing.StartOptions()
-                .setName(name)
-                .setTitle(title)
-                .setScreenshots(true)
-                .setSnapshots(true)
-                .setSources(true));
+        DashboardManager.log("   -> [Trace] Phase: " + title);
     }
 
     private void stopAdminTrace(String label) {
         adminTraceCounter++;
-        String path = String.format("target/admin-%02d-%s-trace.zip", adminTraceCounter, label);
-        context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get(path)));
-        DashboardManager.log("   💾 Admin trace saved → " + path);
+        DashboardManager.log("   -> [Trace] Checkpoint " + adminTraceCounter + ": " + label);
     }
 
     @BeforeAll
@@ -65,16 +66,35 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setChannel("chrome")
-                .setHeadless(true)
+                .setHeadless(false)
         );
     }
 
     @BeforeEach
     void setup() {
         adminTraceCounter = 0;
+
+        // ── Single context — both tabs share same browser window ──
         context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-        page = context.newPage();
-        page.navigate("https://uat-admin.embtalent.ai/login");
+
+        // ── Single tracing session — runs continuously, one trace saved in tearDown ──
+        context.tracing().start(new Tracing.StartOptions()
+                .setScreenshots(true).setSnapshots(true).setSources(true));
+
+        // Tab 1 — Admin portal
+        adminPage = context.newPage();
+        adminPage.setDefaultTimeout(60000);
+        adminPage.setDefaultNavigationTimeout(90000);
+        adminPage.navigate(ADMIN_URL);
+
+        // Tab 2 — Vendor portal (login happens on first vendor step)
+        vendorPage = context.newPage();
+        vendorPage.setDefaultTimeout(60000);
+        vendorPage.setDefaultNavigationTimeout(90000);
+        vendorPage.navigate(VENDOR_URL);
+
+        // Switch back to admin tab to start
+        adminPage.bringToFront();
     }
 
     @Test
@@ -88,7 +108,7 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         // =====================================================================================
         startAdminTrace("Phase1-Setup", "Admin - Setup & Shortlist");
 
-        LoginPage loginPage = new LoginPage(page);
+        LoginPage loginPage = new LoginPage(adminPage);
         assertTrue(loginPage.login("bharat.pandey@emb.global", "Emb@1234"), "Login failed");
 
         String firstReqName;
@@ -96,46 +116,46 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         if (TARGET_REQUIREMENT != null && !TARGET_REQUIREMENT.trim().isEmpty()) {
             DashboardManager.log("[REPORT] 🎯 Target Requirement specified: " + TARGET_REQUIREMENT);
             firstReqName = TARGET_REQUIREMENT;
-            page.locator("a[href='/hiring-requests']").first().click();
-            page.waitForLoadState();
+            adminPage.locator("a[href='/hiring-requests']").first().click();
+            adminPage.waitForLoadState();
         } else {
             DashboardManager.log("[REPORT] 🆕 No Target Requirement specified. Creating a new one...");
-            RequirementListingPage listingPage = new RequirementListingPage(page);
+            RequirementListingPage listingPage = new RequirementListingPage(adminPage);
             assertTrue(listingPage.clickNewRequirement(), "Navigation failed");
 
-            CreateRequirementPage createPage = new CreateRequirementPage(page);
+            CreateRequirementPage createPage = new CreateRequirementPage(adminPage);
             boolean success = createPage.createMultipleRequirements(List.of(
                     new CreateRequirementPage.RequirementData("Full Time", "Onsite", "JS", "React", "52106", JD_FILE_PATH)
             ), "Requirement generated successfully");
             assertTrue(success, "Failed to create requirements");
 
             firstReqName = verifyTopRequirements(1);
-            page.locator("a[href='/hiring-requests']").first().click();
-            page.waitForLoadState();
+            adminPage.locator("a[href='/hiring-requests']").first().click();
+            adminPage.waitForLoadState();
         }
 
         searchAndOpenRequirementFromTest(firstReqName);
 
         DashboardManager.log("\n[REPORT] 🚀 Starting Partner Shortlisting Flow for: " + firstReqName);
-        PartnerShortlistingPage partnerPage = new PartnerShortlistingPage(page);
-        page.locator("button[role='tab']").filter(new Locator.FilterOptions().setHasText(Pattern.compile("Partner Shortlisting"))).first().click();
-        page.waitForTimeout(2000);
+        PartnerShortlistingPage partnerPage = new PartnerShortlistingPage(adminPage);
+        adminPage.locator("button[role='tab']").filter(new Locator.FilterOptions().setHasText(Pattern.compile("Partner Shortlisting"))).first().click();
+        adminPage.waitForTimeout(2000);
 
         try {
-            page.locator("div.font-semibold").filter(new Locator.FilterOptions().setHasText("Search & Filters")).first().click();
-            page.waitForTimeout(1000);
+            adminPage.locator("div.font-semibold").filter(new Locator.FilterOptions().setHasText("Search & Filters")).first().click();
+            adminPage.waitForTimeout(1000);
         } catch (Exception e) {
             DashboardManager.log("      ⚠️ Search & Filters button not found.");
         }
 
-        Locator shortlistedSearchInput = page.locator("input[placeholder='Search shortlisted partners...']");
+        Locator shortlistedSearchInput = adminPage.locator("input[placeholder='Search shortlisted partners...']");
         shortlistedSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
         shortlistedSearchInput.fill("bharat pvt ltd");
-        page.waitForTimeout(2000);
+        adminPage.waitForTimeout(2000);
 
-        if (page.locator("div.text-muted-foreground").filter(new Locator.FilterOptions().setHasText("No Shortlisted Partners Found.")).isVisible()) {
+        if (adminPage.locator("div.text-muted-foreground").filter(new Locator.FilterOptions().setHasText("No Shortlisted Partners Found.")).isVisible()) {
             shortlistedSearchInput.clear();
-            page.waitForTimeout(1000);
+            adminPage.waitForTimeout(1000);
             partnerPage.shortlistVendors(List.of("bharat pvt ltd"));
             partnerPage.clickSendHiringRequirement();
             partnerPage.fillBudgetDetails();
@@ -148,26 +168,20 @@ public class ScheduleInterviewAssignmentAssessmentTest {
 
         stopAdminTrace("setup-shortlist");
 
-// =====================================================================================
-// PHASE 2: VENDOR SUBMITS CANDIDATE
-// =====================================================================================
+        // =====================================================================================
+        // PHASE 2: VENDOR SUBMITS CANDIDATE
+        // =====================================================================================
         DashboardManager.log("\n[REPORT] 🔄 Switching to Vendor Portal to Add Candidate...");
 
-        BrowserContext vendorContext = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
-        vendorContext.tracing().start(new Tracing.StartOptions()
-                .setName("Vendor-Submit-Candidate")
-                .setTitle("Vendor - Submit Candidate")
-                .setScreenshots(true).setSnapshots(true).setSources(true));
-
-        Page vendorPage = vendorContext.newPage();
-        vendorPage.navigate(VENDOR_URL);
+        // Switch to vendor tab — first time, login needed
+        vendorPage.bringToFront();
+        navigateAndLoginIfNeeded(vendorPage, VENDOR_URL, VENDOR_EMAIL, VENDOR_PASS);
 
         SubmitCandidatePage submitPage = new SubmitCandidatePage(vendorPage);
-        submitPage.loginToVendorPortal(VENDOR_EMAIL, VENDOR_PASS);
         submitPage.navigateToProject(firstReqName);
         submitPage.acceptProject();
 
-// ── Inline: Add New Member with full flow ──────────────────────
+        // ── Inline: Add New Member with full flow ──────────────────────
         DashboardManager.log("👥 Adding 1 member inline...");
         try {
             Locator addBtn = vendorPage.locator("button")
@@ -176,14 +190,12 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             addBtn.click();
             vendorPage.waitForTimeout(1000);
 
-            // ── STEP 1: Upload Resume ──────────────────────────────────
             DashboardManager.log("   📤 Uploading Resume...");
             vendorPage.locator("input[type='file'][accept='.pdf']").first()
                     .setInputFiles(Paths.get(JD_FILE_PATH));
             DashboardManager.log("   ✅ Resume file attached.");
             vendorPage.waitForTimeout(2000);
 
-            // ── STEP 2: Click Import from Resume ──────────────────────
             DashboardManager.log("   -> Clicking 'Import from resume'...");
             vendorPage.locator("button")
                     .filter(new Locator.FilterOptions().setHasText("Import from resume"))
@@ -191,7 +203,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
                     .click(new Locator.ClickOptions().setForce(true));
             DashboardManager.log("   -> Clicked. Waiting for toast (max 59s)...");
 
-            // ── STEP 3: Check toast 59s ────────────────────────────────
             boolean toastFound = false;
             try {
                 vendorPage.locator("span")
@@ -220,7 +231,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             }
             vendorPage.waitForTimeout(1500);
 
-            // ── STEP 4: Fill Basic Info ────────────────────────────────
             DashboardManager.log("   📝 Filling Basic Info...");
             vendorPage.locator("input[name='name']").clear();
             vendorPage.locator("input[name='name']").fill("candidate 1");
@@ -237,7 +247,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   ✅ Basic Info Filled.");
 
-            // ── STEP 5: Add Awards ─────────────────────────────────────
             DashboardManager.log("   🏆 Adding Award...");
             vendorPage.locator("button")
                     .filter(new Locator.FilterOptions().setHasText("Add Awards")).click();
@@ -262,7 +271,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             vendorPage.waitForTimeout(2000);
             DashboardManager.log("   ✅ Award Added.");
 
-            // ── STEP 6: Engagement & Financials ───────────────────────
             DashboardManager.log("   ⚙️ Filling Engagement & Financials...");
             vendorPage.locator("button[role='combobox']").nth(1).click();
             vendorPage.waitForTimeout(500);
@@ -285,7 +293,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   ✅ Engagement & Financials Filled.");
 
-            // ── STEP 7: Notice Period ──────────────────────────────────────
             DashboardManager.log("   ⏳ Selecting Notice Period...");
             try {
                 vendorPage.locator("button[role='combobox']")
@@ -301,7 +308,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
                 DashboardManager.log("   ❌ Notice Period Failed: " + e.getMessage());
             }
 
-            // ── STEP 8: Current Location ───────────────────────────────
             DashboardManager.log("   📍 Selecting Location...");
             vendorPage.locator("button[role='combobox']")
                     .filter(new Locator.FilterOptions().setHasText("Select location")).click();
@@ -313,15 +319,12 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   ✅ Location: New Delhi, Delhi, India");
 
-            // ── STEP 9: Serviceable Locations ─────────────────────────────
             DashboardManager.log("   🌍 Adding Serviceable Locations...");
             try {
-                // Click "All" in Preferred Mode of Engagement
                 vendorPage.locator("button").filter(new Locator.FilterOptions()
                         .setHasText(Pattern.compile("^All$"))).first().click();
                 vendorPage.waitForTimeout(1000);
 
-                // Click "Add Locations" button — exact text
                 vendorPage.locator("button").filter(new Locator.FilterOptions()
                                 .setHasText("Add Locations")).first()
                         .click(new Locator.ClickOptions().setForce(true));
@@ -354,7 +357,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
                 DashboardManager.log("   ❌ Serviceable Locations Failed: " + e.getMessage());
             }
 
-            // ── STEP 10: Timezone ──────────────────────────────────────
             DashboardManager.log("   🌐 Selecting Timezone...");
             vendorPage.locator("div[role='combobox']")
                     .filter(new Locator.FilterOptions().setHasText("Select Timezones")).click();
@@ -366,7 +368,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             vendorPage.waitForTimeout(1000);
             DashboardManager.log("   ✅ Timezone: India");
 
-            // ── STEP 11: Save Member ───────────────────────────────────
             DashboardManager.log("   💾 Saving Member...");
             vendorPage.locator("button")
                     .filter(new Locator.FilterOptions().setHasText(Pattern.compile("^Available$"))).first()
@@ -396,29 +397,23 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             DashboardManager.log("❌ Inline Add Member Failed: " + e.getMessage());
         }
 
-// ── Then from team: Candidates 2, 3, 4, 5 ─────────────────────
-        //submitPage.addMembersFromTeam(List.of("Candidate 2", "Candidate 3", "Candidate 4", "Candidate 5"));
         submitPage.submitCandidates();
         submitPage.submitCandidates();
 
-// ── Inline status verification — checks candidate by name + email + Applied status ──
         DashboardManager.log("🔍 Verifying submitted candidate status inline...");
         try {
-            // Wait up to 30s for at least one Applied row to appear
             vendorPage.locator("tr.group")
                     .filter(new Locator.FilterOptions().setHasText("Applied"))
                     .first()
                     .waitFor(new Locator.WaitForOptions()
                             .setState(WaitForSelectorState.VISIBLE).setTimeout(30000));
 
-            // Find the Candidate 1 row specifically
             Locator candidate1Row = vendorPage.locator("tr.group")
                     .filter(new Locator.FilterOptions().setHasText("Candidate 1")).first();
 
             if (candidate1Row.count() > 0) {
                 String name = candidate1Row.locator("h3").first().innerText().trim();
                 String email = candidate1Row.locator("p.text-text-tertiary").first().innerText().trim();
-                // Use .first() to avoid strict mode violation when row has 2 status spans
                 String status = candidate1Row.locator("span.status-blue-text").first().innerText().trim();
                 DashboardManager.log("   👤 Candidate: " + name);
                 DashboardManager.log("   📧 Email: " + email);
@@ -435,9 +430,6 @@ public class ScheduleInterviewAssignmentAssessmentTest {
             DashboardManager.log("   ⚠️ Status verification skipped: " + e.getMessage());
         }
 
-        vendorContext.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-01-submit-candidate-trace.zip")));
-        DashboardManager.log("   💾 Vendor trace saved → target/vendor-01-submit-candidate-trace.zip");
-        vendorContext.close();
         DashboardManager.log("[REPORT] 🎉 Candidate Submitted Successfully.");
 
         // =====================================================================================
@@ -449,18 +441,18 @@ public class ScheduleInterviewAssignmentAssessmentTest {
 
         // 3.1 Admin Requests Interview Slots
         startAdminTrace("Phase3-Admin-Interview-Request", "Admin - Request Interview Slots");
-        page.bringToFront();
-        page.waitForTimeout(1000);
+        adminPage.bringToFront();
+        adminPage.waitForTimeout(1000);
 
-        ScheduleInterviewPage interviewPage = new ScheduleInterviewPage(page);
+        ScheduleInterviewPage interviewPage = new ScheduleInterviewPage(adminPage);
         searchAndOpenRequirementFromTest(firstReqName);
 
         DashboardManager.log("   -> Opening Candidate 1...");
-        page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
-        page.waitForTimeout(1000);
-        page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first()
+        adminPage.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
+        adminPage.waitForTimeout(1000);
+        adminPage.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first()
                 .locator("button[title='View Details']").first().click();
-        page.waitForTimeout(2000);
+        adminPage.waitForTimeout(2000);
 
         interviewPage.updateStatusToScheduleInterview();
         interviewPage.selectInterviewTimeSlots();
@@ -468,46 +460,29 @@ public class ScheduleInterviewAssignmentAssessmentTest {
 
         stopAdminTrace("interview-request-slots");
 
-        // 3.2 Vendor Selects Interview Time
-        BrowserContext vendorContext2 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        vendorContext2.tracing().start(new Tracing.StartOptions()
-                .setName("Vendor-Select-Interview-Time")
-                .setTitle("Vendor - Select Interview Time")
-                .setScreenshots(true).setSnapshots(true).setSources(true));
-        Page vendorPage2 = vendorContext2.newPage();
+        // 3.2 Vendor Selects Interview Time — reuse vendor tab
+        vendorPage.bringToFront();
+        navigateAndLoginIfNeeded(vendorPage, VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS);
 
-        UploadInterviewPage uploadInterviewPage = new UploadInterviewPage(vendorPage2);
-        uploadInterviewPage.vendorSelectInterviewTime(VENDOR_URL, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
-
-        vendorContext2.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-02-select-interview-time-trace.zip")));
-        DashboardManager.log("   💾 Vendor trace saved → target/vendor-02-select-interview-time-trace.zip");
-        vendorContext2.close();
+        UploadInterviewPage uploadInterviewPage = new UploadInterviewPage(vendorPage);
+        uploadInterviewPage.vendorSelectInterviewTime(VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
 
         // 3.3 Admin Schedules & Gives Feedback
         startAdminTrace("Phase3-Admin-Interview-Feedback", "Admin - Interview Feedback");
-        page.bringToFront();
-        page.waitForTimeout(1000);
+        adminPage.bringToFront();
+        adminPage.waitForTimeout(1000);
 
-        UploadInterviewPage adminFeedbackPage = new UploadInterviewPage(page);
+        UploadInterviewPage adminFeedbackPage = new UploadInterviewPage(adminPage);
         adminFeedbackPage.adminScheduleAndFeedbackInterview(firstReqName, "Candidate 1");
 
         stopAdminTrace("interview-feedback");
 
-        // 3.4 Vendor Verifies Final Interview Status
-        BrowserContext vendorContext3 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        vendorContext3.tracing().start(new Tracing.StartOptions()
-                .setName("Vendor-Verify-Interview")
-                .setTitle("Vendor - Verify Interview Status")
-                .setScreenshots(true).setSnapshots(true).setSources(true));
-        Page vendorPage3 = vendorContext3.newPage();
+        // 3.4 Vendor Verifies Final Interview Status — reuse vendor tab
+        vendorPage.bringToFront();
+        navigateAndLoginIfNeeded(vendorPage, VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS);
 
-        UploadInterviewPage vendorFinalVerifyPage = new UploadInterviewPage(vendorPage3);
-        vendorFinalVerifyPage.vendorVerifyFinalInterviewStatus(VENDOR_URL, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
-
-        vendorContext3.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-03-verify-interview-trace.zip")));
-        DashboardManager.log("   💾 Vendor trace saved → target/vendor-03-verify-interview-trace.zip");
-        vendorContext3.close();
-
+        UploadInterviewPage vendorFinalVerifyPage = new UploadInterviewPage(vendorPage);
+        vendorFinalVerifyPage.vendorVerifyFinalInterviewStatus(VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
 
         // =====================================================================================
         // PHASE 4: ASSIGNMENT FLOW
@@ -518,18 +493,18 @@ public class ScheduleInterviewAssignmentAssessmentTest {
 
         // 4.1 Admin Schedules Assignment
         startAdminTrace("Phase4-Admin-Schedule-Assignment", "Admin - Schedule Assignment");
-        page.bringToFront();
-        page.waitForTimeout(1000);
+        adminPage.bringToFront();
+        adminPage.waitForTimeout(1000);
 
-        ScheduleAssignmentPage assignmentPage = new ScheduleAssignmentPage(page);
+        ScheduleAssignmentPage assignmentPage = new ScheduleAssignmentPage(adminPage);
         searchAndOpenRequirementFromTest(firstReqName);
 
         DashboardManager.log("   -> Opening Candidate 1...");
-        page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
-        page.waitForTimeout(1000);
-        page.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first()
+        adminPage.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
+        adminPage.waitForTimeout(1000);
+        adminPage.locator("tr").filter(new Locator.FilterOptions().setHasText("Candidate 1")).first()
                 .locator("button[title='View Details']").first().click();
-        page.waitForTimeout(2000);
+        adminPage.waitForTimeout(2000);
 
         assignmentPage.updateStatusToScheduleAssignment();
         assignmentPage.scheduleAssignmentAction(JD_FILE_PATH);
@@ -537,63 +512,47 @@ public class ScheduleInterviewAssignmentAssessmentTest {
 
         stopAdminTrace("assignment-schedule");
 
-        // 4.2 Vendor Submits Solution
-        BrowserContext vendorContext4 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        vendorContext4.tracing().start(new Tracing.StartOptions()
-                .setName("Vendor-Assignment-Solution")
-                .setTitle("Vendor - Submit Assignment Solution")
-                .setScreenshots(true).setSnapshots(true).setSources(true));
-        Page vendorPage4 = vendorContext4.newPage();
+        // 4.2 Vendor Submits Solution — reuse vendor tab
+        vendorPage.bringToFront();
+        navigateAndLoginIfNeeded(vendorPage, VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS);
 
-        ScheduleAssignmentPage vendorAssignmentPage = new ScheduleAssignmentPage(vendorPage4);
-        vendorAssignmentPage.vendorSubmitAssignmentSolution(VENDOR_URL, VENDOR_EMAIL, VENDOR_PASS, firstReqName, JD_FILE_PATH);
-
-        vendorContext4.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-04-assignment-solution-trace.zip")));
-        DashboardManager.log("   💾 Vendor trace saved → target/vendor-04-assignment-solution-trace.zip");
-        vendorContext4.close();
+        ScheduleAssignmentPage vendorAssignmentPage = new ScheduleAssignmentPage(vendorPage);
+        vendorAssignmentPage.vendorSubmitAssignmentSolution(VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS, firstReqName, JD_FILE_PATH);
 
         // 4.3 Admin Feedback on Assignment
         startAdminTrace("Phase4-Admin-Assignment-Feedback", "Admin - Assignment Feedback");
-        page.bringToFront();
-        page.waitForTimeout(1000);
+        adminPage.bringToFront();
+        adminPage.waitForTimeout(1000);
 
         assignmentPage.adminSubmitAssignmentFeedback(firstReqName, "Candidate 1");
 
         stopAdminTrace("assignment-feedback");
 
-        // 4.4 Vendor Verifies Final Assignment Status
-        BrowserContext vendorContext5 = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 900));
-        vendorContext5.tracing().start(new Tracing.StartOptions()
-                .setName("Vendor-Verify-Assignment")
-                .setTitle("Vendor - Verify Assignment Status")
-                .setScreenshots(true).setSnapshots(true).setSources(true));
-        Page vendorPage5 = vendorContext5.newPage();
+        // 4.4 Vendor Verifies Final Assignment Status — reuse vendor tab
+        vendorPage.bringToFront();
+        navigateAndLoginIfNeeded(vendorPage, VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS);
 
-        ScheduleAssignmentPage vendorVerifyAssignmentPage = new ScheduleAssignmentPage(vendorPage5);
-        vendorVerifyAssignmentPage.vendorVerifyFinalAssignmentStatus(VENDOR_URL, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
+        ScheduleAssignmentPage vendorVerifyAssignmentPage = new ScheduleAssignmentPage(vendorPage);
+        vendorVerifyAssignmentPage.vendorVerifyFinalAssignmentStatus(VENDOR_DASHBOARD, VENDOR_EMAIL, VENDOR_PASS, firstReqName);
 
-        vendorContext5.tracing().stop(new Tracing.StopOptions().setPath(Paths.get("target/vendor-05-verify-assignment-trace.zip")));
-        DashboardManager.log("   💾 Vendor trace saved → target/vendor-05-verify-assignment-trace.zip");
-        vendorContext5.close();
-
-// =====================================================================================
+        // =====================================================================================
         // PHASE 5: ASSESSMENT FLOW
         // =====================================================================================
         DashboardManager.log("\n========================================================");
         DashboardManager.log("                 PHASE 5: ASSESSMENT FLOW                 ");
         DashboardManager.log("========================================================\n");
 
-        // 5.1 Admin: Schedule Assessment + Cancel + Print Details Card
+        // 5.1 Admin: Schedule Assessment
         startAdminTrace("Phase5-Admin-Schedule-Assessment", "Admin - Schedule Assessment");
-        page.bringToFront();
-        page.waitForTimeout(1000);
+        adminPage.bringToFront();
+        adminPage.waitForTimeout(1000);
 
-        ScheduleAssessmentPage adminAssessment = new ScheduleAssessmentPage(page);
+        ScheduleAssessmentPage adminAssessment = new ScheduleAssessmentPage(adminPage);
         searchAndOpenRequirementFromTest(firstReqName);
 
         DashboardManager.log("   -> Clicking 'Candidates' Tab...");
-        page.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
-        page.waitForTimeout(1000);
+        adminPage.getByRole(AriaRole.TAB).filter(new Locator.FilterOptions().setHasText("Candidates")).click();
+        adminPage.waitForTimeout(1000);
 
         adminAssessment.openCandidateAndVerify("Candidate 1", "Vendor AED");
         adminAssessment.adminUpdateStatusToAssessment();
@@ -603,14 +562,25 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         DashboardManager.log("\n[REPORT] 🎉 ALL PHASES COMPLETED SUCCESSFULLY!");
     }
 
+    // ── HELPER: Navigate to URL, login only if needed ─────────────
+    private void navigateAndLoginIfNeeded(Page page, String url, String email, String password) {
+        page.navigate(url);
+        page.waitForTimeout(2000);
+        if (page.locator("input[name='email']").isVisible()) {
+            DashboardManager.log("   -> Session expired. Logging in...");
+            page.locator("input[name='email']").fill(email);
+            page.locator("input[name='password']").fill(password);
+            page.locator("button[type='submit']").click();
+            page.waitForTimeout(3000);
+        } else {
+            DashboardManager.log("   -> Already logged in. Skipping login.");
+        }
+    }
 
-    // ──────────────────────────────────────────────────────────────
-    // HELPER & TEARDOWN METHODS
-    // ──────────────────────────────────────────────────────────────
-
+    // ── HELPER: Verify top requirements ───────────────────────────
     private String verifyTopRequirements(int limit) {
         DashboardManager.log("\n[REPORT] 🔍 Verifying Table Data...");
-        Locator rows = page.locator("tbody tr");
+        Locator rows = adminPage.locator("tbody tr");
         try {
             rows.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
             rows.first().locator("td:nth-child(2)").getByText(Pattern.compile("Req-")).first()
@@ -639,22 +609,24 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         return firstTitle;
     }
 
+    // ── HELPER: Search and open requirement ───────────────────────
     private void searchAndOpenRequirementFromTest(String reqName) {
         DashboardManager.log("   -> Navigating to Requirement Listing...");
-        page.locator("a[href='/hiring-requests']").first().click();
-        page.waitForLoadState();
-        page.waitForTimeout(2000);
+        adminPage.locator("a[href='/hiring-requests']").first().click();
+        adminPage.waitForLoadState();
+        adminPage.waitForTimeout(2000);
 
         DashboardManager.log("   -> Searching for Requirement: " + reqName);
-        Locator reqSearchFilterBtn = page.locator("div.font-semibold").filter(new Locator.FilterOptions().setHasText("Search & Filters")).first();
+        Locator reqSearchFilterBtn = adminPage.locator("div.font-semibold")
+                .filter(new Locator.FilterOptions().setHasText("Search & Filters")).first();
         reqSearchFilterBtn.click();
-        Locator reqSearchInput = page.locator("input[placeholder='Search by client name, budget, title, email ...']");
+        Locator reqSearchInput = adminPage.locator("input[placeholder='Search by client name, budget, title, email ...']");
         reqSearchInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         reqSearchInput.fill(reqName);
-        page.waitForTimeout(2000);
+        adminPage.waitForTimeout(2000);
 
         DashboardManager.log("   -> Opening Requirement: " + reqName);
-        Locator reqRow = page.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
+        Locator reqRow = adminPage.locator("tr").filter(new Locator.FilterOptions().setHasText(reqName));
         Locator viewDetailsBtn = reqRow.locator("button[title='View Details']");
 
         if (viewDetailsBtn.count() > 0) {
@@ -662,19 +634,18 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         } else {
             reqRow.locator("a").first().click();
         }
-        page.waitForTimeout(2000);
+        adminPage.waitForTimeout(2000);
     }
 
     @AfterEach
     void tearDown(TestInfo testInfo) {
         if (context != null) {
             try {
-                String tracePath = "target/" + testInfo.getDisplayName().replace(" ", "_") + "-fallback-trace.zip";
-                context.tracing().stop(new Tracing.StopOptions().setPath(Paths.get(tracePath)));
-                DashboardManager.log("   💾 Fallback trace saved → " + tracePath);
-            } catch (Exception e) {
-                // Already stopped cleanly
-            }
+                // ── Single combined trace — all tabs, all phases in one file ──
+                context.tracing().stop(new Tracing.StopOptions()
+                        .setPath(Paths.get("target/e2e-daily-full-trace.zip")));
+                DashboardManager.log("   💾 Full E2E trace saved → target/e2e-daily-full-trace.zip");
+            } catch (Exception ignored) {}
             context.close();
         }
     }
@@ -688,10 +659,7 @@ public class ScheduleInterviewAssignmentAssessmentTest {
         EmailSender.sendDashboardEmail(
                 "🚀 EMB Automation: Daily E2E Execution Report",
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global",
-                "Ashish.mishra@emb.global",
-                "prakash@emb.global",
-                "saumya.gupta@emb.global"
+                "bharat.pandey@emb.global"
         );
     }
 }
