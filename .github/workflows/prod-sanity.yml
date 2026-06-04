@@ -19,7 +19,7 @@ jobs:
       EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
 
       # ── Non-secret config — safe to inline ───────────────────────────────────
-      UAT_VENDOR_URL:  https://uat-vendor.embtalent.ai/login
+      UAT_VENDOR_URL:  https://dev-vendor.embtalent.ai/login
       UAT_REQ_NAME:    Test Sanity Requirement
       UAT_RESUME_PATH: src/test/resources/Shashikant.pdf
 
