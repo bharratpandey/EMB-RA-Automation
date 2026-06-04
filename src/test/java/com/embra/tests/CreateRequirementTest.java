@@ -62,7 +62,7 @@ public class CreateRequirementTest {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setChannel("chrome")
-                .setHeadless(false)
+                .setHeadless(true)
         );
     }
 
@@ -668,7 +668,9 @@ public class CreateRequirementTest {
         EmailSender.sendDashboardEmail(
                 "🚀 EMB Automation: Weekly E2E Execution Report",
                 "bharatpandey011@gmail.com",
-                "bharat.pandey@emb.global"
+                "bharat.pandey@emb.global",
+                "ashish.mishra@emb.global",
+                "saumya.gupta@emb.global"
         );
     }
 }

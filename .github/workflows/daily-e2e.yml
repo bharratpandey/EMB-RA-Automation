@@ -44,7 +44,7 @@ jobs:
 
       - name: Run Test
         id: run_test
-        run: mvn test -Dtest="ScheduleInterviewAssignmentAssessmentTest#testMasterE2EFlow" --no-transfer-progress
+        run: xvfb-run mvn test -Dtest="ScheduleInterviewAssignmentAssessmentTest#testMasterE2EFlow" --no-transfer-progress
 
       - name: Upload Traces
         if: always()

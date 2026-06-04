@@ -24,7 +24,7 @@ public class ReportGenerationCheckTest {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setChannel("chrome")
-                .setHeadless(false)
+                .setHeadless(true)
         );
     }
 
