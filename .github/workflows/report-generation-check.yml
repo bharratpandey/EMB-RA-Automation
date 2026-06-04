@@ -2,14 +2,12 @@ name: Report Generation Check
 
 on:
   schedule:
-    # 9:00 AM IST = 3:30 AM UTC
-    - cron: '30 3 * * *'
-    # 7:00 PM IST = 1:30 PM UTC
-    - cron: '30 13 * * *'
+    # 7:30 AM IST = 2:00 AM UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:
-  run-report-check:
+  run-report-generation-check:
     runs-on: ubuntu-latest
 
     steps:
@@ -40,14 +38,126 @@ jobs:
           java -cp "$PLAYWRIGHT_JAR:$DRIVER_JAR:$BUNDLE_JAR" com.microsoft.playwright.CLI install chromium
 
       - name: Run Report Generation Check
+        id: run_test
         run: xvfb-run mvn test -Dtest=ReportGenerationCheckTest
         env:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           IMAP_APP_PASSWORD: ${{ secrets.IMAP_APP_PASSWORD }}
 
-      - name: Upload Dashboard Backup
+      - name: Upload Dashboard Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Report-Generation-Dashboard
           path: target/AutomationDashboard.html
+
+      - name: Upload Admin Trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Report-Generation-Admin-Trace
+          path: target/report-generation-admin-trace.zip
+
+      - name: Upload Gmail Trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Report-Generation-Gmail-Trace
+          path: target/report-generation-gmail-trace.zip
+
+      # ── Save report + traces to Supabase ─────────────────────────
+      - name: Save to Supabase Dashboard
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ "${{ steps.run_test.outcome }}" == "success" ]; then
+            STATUS="PASS"
+          else
+            STATUS="FAIL"
+          fi
+
+          TIMESTAMP=$(date +%s)
+          REPORT_URL="null"
+          TRACES_JSON="[]"
+
+          # Upload HTML report
+          REPORT_FILE="target/AutomationDashboard.html"
+          if [ -f "$REPORT_FILE" ]; then
+            REPORT_NAME="EMB_RA_ReportGenCheck_${TIMESTAMP}.html"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: text/html" \
+              -H "x-upsert: true" \
+              --data-binary @"${REPORT_FILE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${REPORT_NAME}")
+            echo "Report upload HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              REPORT_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${REPORT_NAME}"
+              echo "Report URL: $REPORT_URL"
+            fi
+          fi
+
+          # Upload admin trace
+          ADMIN_TRACE="target/report-generation-admin-trace.zip"
+          if [ -f "$ADMIN_TRACE" ]; then
+            ADMIN_NAME="EMB_RA_ReportGenCheck_admin_trace_${TIMESTAMP}.zip"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: application/zip" \
+              -H "x-upsert: true" \
+              --data-binary @"${ADMIN_TRACE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${ADMIN_NAME}")
+            echo "Admin trace HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              ADMIN_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${ADMIN_NAME}"
+              TRACES_JSON="[{\"name\":\"report-generation-admin-trace.zip\",\"url\":\"${ADMIN_URL}\"}]"
+            fi
+          fi
+
+          # Upload gmail trace
+          GMAIL_TRACE="target/report-generation-gmail-trace.zip"
+          if [ -f "$GMAIL_TRACE" ]; then
+            GMAIL_NAME="EMB_RA_ReportGenCheck_gmail_trace_${TIMESTAMP}.zip"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Content-Type: application/zip" \
+              -H "x-upsert: true" \
+              --data-binary @"${GMAIL_TRACE}" \
+              "${SUPABASE_URL}/storage/v1/object/reports/${GMAIL_NAME}")
+            echo "Gmail trace HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              GMAIL_URL="${SUPABASE_URL}/storage/v1/object/public/reports/${GMAIL_NAME}"
+              TRACES_JSON=$(echo "$TRACES_JSON" | sed "s/\]$/,{\"name\":\"report-generation-gmail-trace.zip\",\"url\":\"${GMAIL_URL}\"}]/")
+            fi
+          fi
+
+          # Insert row
+          curl -s -X POST \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"project\": \"EMB_RA\",
+              \"report_name\": \"RA Report Generation Check\",
+              \"environment\": \"PROD\",
+              \"status\": \"${STATUS}\",
+              \"passed\": 0,
+              \"failed\": 0,
+              \"total\": 0,
+              \"duration_seconds\": 0,
+              \"report_url\": $([ "$REPORT_URL" = "null" ] && echo "null" || echo "\"${REPORT_URL}\""),
+              \"trace_url\": null,
+              \"traces\": ${TRACES_JSON}
+            }" \
+            "${SUPABASE_URL}/rest/v1/test_reports"
+
+          echo "✅ Saved to Supabase dashboard (status: ${STATUS})"

@@ -151,6 +151,7 @@ jobs:
             -H "Prefer: return=minimal" \
             -d "{
               \"project\": \"EMB_RA\",
+              \"report_name\": \"RA Weekly E2E Full Flow\",
               \"environment\": \"UAT\",
               \"status\": \"${STATUS}\",
               \"passed\": 0,
