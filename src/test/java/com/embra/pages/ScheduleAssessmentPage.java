@@ -79,19 +79,27 @@ public class ScheduleAssessmentPage {
 
     public void openCandidateAndVerify(String candidateName, String vendorName) {
         DashboardManager.log("👤 Opening Candidate: " + candidateName + " (" + vendorName + ")");
+
         Locator row = page.locator("tr")
                 .filter(new Locator.FilterOptions().setHasText(candidateName))
-                .filter(new Locator.FilterOptions().setHasText(vendorName));
+                .filter(new Locator.FilterOptions().setHasText(vendorName)).first();
 
-        row.locator("a").first().click();
-        page.waitForTimeout(2000);
+        // Check status in the listing row BEFORE clicking into details
+        // Status uses inline style, target by text content inside the status cell
+        Locator statusCell = row.locator("td").nth(4); // 5th column is status
+        String statusText = statusCell.innerText().trim().replaceAll("\\s+", " ");
+        DashboardManager.log("   -> Row Status: " + statusText);
 
-        Locator statusBadge = page.locator("div.text-white").filter(new Locator.FilterOptions().setHasText("Applied"));
-        if (statusBadge.isVisible()) {
-            DashboardManager.log("   ✅ Candidate Status: Applied");
+        if (statusText.contains("Assignment Completed")) {
+            DashboardManager.log("   ✅ Candidate Status: Assignment Completed"
+                    + (statusText.contains("Selected") ? " + Selected" : ""));
         } else {
-            DashboardManager.log("   ❌ Candidate Status NOT 'Applied'");
+            DashboardManager.log("   ❌ Candidate Status NOT 'Assignment Completed'. Found: " + statusText);
         }
+
+        // Click eye icon to open details
+        row.locator("button[title='View Details']").click();
+        page.waitForTimeout(2000);
     }
 
     public void adminUpdateStatusToAssessment() {
